@@ -1,0 +1,26 @@
+/*Custom CSS Goes Here*/
+
+:root {
+   --spacing-company: 3rem;
+   --font-weight: 400;
+   --border-radius: 0;
+   line-height: 2.0em;
+ }
+
+ @media (min-width: 992px) {
+   .container {
+     max-width: 700px;
+   }
+ }
+ @media (min-width: 1200px) {
+   .container {
+     max-width: 700px;
+   }
+ }
+
+#post-entry {
+  font-family: Merriweather;
+  font-size: 1.1rem;
+  line-height: 1.84;
+  color: rgba(0, 0, 0, .8);
+}
