@@ -3,97 +3,1248 @@
     <title>David Gorski&#x27;s Tech Blog</title>
     <link href="https://tech.davidgorski.ca/feed.xml" rel="self" />
     <link href="https://tech.davidgorski.ca" />
-    <updated>2023-05-20T16:18:36-04:00</updated>
+    <updated>2023-07-29T14:33:32-04:00</updated>
     <author>
         <name>David Gorski</name>
     </author>
     <id>https://tech.davidgorski.ca</id>
 
     <entry>
+        <title>Truncating String White-space At Compile Time in C++</title>
+        <author>
+            <name>David Gorski</name>
+        </author>
+        <link href="https://tech.davidgorski.ca/truncating-string-white-space-at-compile-time-in-c.html"/>
+        <id>https://tech.davidgorski.ca/truncating-string-white-space-at-compile-time-in-c.html</id>
+            <category term="constexpr"/>
+            <category term="Programming"/>
+            <category term="C++"/>
+
+        <updated>2023-07-29T14:33:32-04:00</updated>
+            <summary></summary>
+        <content type="html">
+            <![CDATA[
+                <p>One problem that arises when interleaving SQL queries in C++ code is string literal formatting and spacing. Most queries are much more human-digestible in a multi-line format. C++ treats adjacent string literals as one, so the traditional C++ solution is this:</p>
+<pre><code class="language-c++">const char* query =
+    &quot; SELECT &quot;
+        &quot; u.id, &quot;
+        &quot; u.user_name, &quot;
+        &quot; u.ref_id, &quot;
+        &quot; u.postal_code, &quot;
+        &quot; u.email, &quot;
+        &quot; o.transaction.id &quot;
+    &quot; FROM &quot;
+        &quot; users u &quot;
+    &quot; JOIN &quot;
+        &quot; orders o ON o.user_id = u.id &quot;
+    &quot; WHERE &quot;
+        &quot; u.id=? AND u.active=? &quot;;
+</code></pre>
+<p>A programmer has to be very careful with the white-space before and after the SQL tokens as their presence or lack-thereof could be the difference between a good night’s sleep, or a run-time exception triggering a on-call alert late at night. Fun! Overall this code snippet is much more difficult to read due to the syntactical mess of quotation marks around it. To help prevent issues I have even heard this old platitude from a veteran C++ programmer: “A good surgeon washes his hands before and after the surgery”; mandating spaces at the beginning and end of each line. Is a rule of thumb really a best practice? One’s best work is done with as little distraction as possible, and this is something else to worry about.</p>
+<p>Modern C++ provides us with one useful addition that can help mitigate this issue: the raw string literal. Leveraging this feature we can write the query naturally; all within one pair of quotations:</p>
+<pre><code class="language-c++">const char* query = R&quot;(
+    SELECT
+        u.id,
+        u.user_name,
+        u.ref_id,
+        u.postal_code,
+        u.email,
+        o.transaction.id
+    FROM
+        users u
+    JOIN
+        orders o ON o.user_id = u.id
+    WHERE
+        u.id=? AND u.active=?
+)&quot;;
+</code></pre>
+<p>This works rather well. You can define the same exact query, presented very simply and clear. You don’t have to ‘worry’ about the C++ surrounding the SQL. You can just focus on the SQL. The problem is, all those spaces, tabs and newline characters are also in the final query string. The raw string is <strong>298 characters</strong> long versus the original <strong>166 characters</strong>. This means you pass a query string that is almost <strong>double in length</strong> to any query parsing function/module. Now, with the performance of modern hardware this penalty is negligible. However, sometimes, this code is ran in a hot path or you might have a sense of guilt for such an obvious efficiency sacrifice. Let’s make things right in the universe…</p>
+<p>The first, conceptually simplest, obvious solution is to run a string-slimming function on all queries when program execution starts. This approach is good enough, but all sub-approaches in this branch have disadvantages:</p>
+<ul>
+<li>If you want the query to be ready before a certain function is called, you will unfortunately have to move the query variable out of it’s logical code block. This can reduce the clarity of intent and logic locality.</li>
+<li>If you want to keep the query nested where it’s used, you will have to devise some kind of static initialization function that runs the first time the function is called. A static flag will have to be checked every time the function is called to determine whether the string has been ‘slimmed’ yet.</li>
+<li>You will need to allocate a new destination buffer for the ‘slimmed’ query.</li>
+</ul>
+<p>As suggested by this article’s title we can actually do this string processing at compile time, with no penalty to our code’s logic or clarity. </p>
+<h2 id="contexpr-variables-functions-and-classes">‘contexpr’ Variables, Functions and Classes</h2>
+<p>Modern C++ provides the <a href="https://en.cppreference.com/w/cpp/language/constexpr">constexpr</a> functionality to provide compile-time code utilities. There are a lot of resources available online detailing this, so I won’t go into detail. Fundamentally, you can mark your functions, classes and variables with the <strong>constexpr</strong> keyword to signify they could potentially be called or created at compile time. This is not a guarantee, but a contract of sorts. A summary of the rules:</p>
+<ul>
+<li>A <strong>constexpr variable</strong> must be initialized as a constexpr type with a constepxr function. These must be constructed/called with either literals or other constexpr variables as arguments.</li>
+<li>A <strong>constexpr function</strong> can only take and return constexpr types. The key thing to know is that arguments can be accepted as constexpr, but not passed on as constexpr. Once within the function you cannot guarantee the argument values are known at compile time, even though they might be.</li>
+<li>A <strong>constexpr type/class</strong> can only have constexpr type members and must at least one constexpr constructor. All scalar types and arrays are considered constexpr.</li>
+</ul>
+<p>I’m fairly new to <strong>constexpr</strong> myself, so please do your own research, and reach out if I’m incorrect.</p>
+<h2 id="implementing-a-compile-time-string">Implementing a Compile Time String</h2>
+<p>In order to perform our string parsing/creation at compile time, we need to implement a string class that satisfies the constexpr ‘contract’ for types. We must ensure that all methods we want to call after the constexpr variable construction are marked as ‘const’. The implementation is pretty self explanatory when keeping in mind the restrictions:</p>
+<pre><code class="language-c++">namespace compiletime {
+
+template&lt;std::size_t MaxSize = 30&gt;
+class string
+{
+    char m_data[MaxSize] = { 0 };
+    std::size_t m_size;
+public:
+    constexpr string() : m_data({}), m_size(0) {}
+    constexpr string(const char* str) : m_data(), m_size(0) {
+        for(int i =0; i&lt;MaxSize; ++i) {
+            m_data[m_size++] = str[i];
+        }
+    }
+    
+    constexpr char const* data() const { return m_data; }
+    constexpr operator const char*() const { return data(); } // for convenience
+    constexpr void push_back(char c) { m_data[m_size++] = c; }
+    constexpr char&amp; operator[](std::size_t i) { return m_data[i]; }
+    constexpr char const&amp; operator[](std::size_t i) const { return m_data[i]; }
+    constexpr size_t size() const { return m_size; }
+    constexpr const char* begin() const { return std::begin(m_data); }
+    constexpr const char* end() const { return std::begin(m_data) + m_size; }
+};
+
+}
+</code></pre>
+<h2 id="2-implementing-a-compile-time-parser">2. Implementing a Compile Time Parser</h2>
+<p>Now that we have a string class that can used with <strong>constexpr variables</strong>, we can run <strong>constepxr</strong> functions that take this string type as arguments. Remember, in constexpr functions all arguments can be accepted as constexpr, but not passed as constexpr. Additionally, we can only use other constexpr functions and types within the function.</p>
+<p>First, let’s implement a simple function which checks if a provided character is a whitespace character:</p>
+<pre><code class="language-c++">constexpr bool is_whitespace(char c) {
+    return
+        (c == &#39; &#39;) ||
+        (c == &#39;\t&#39;) ||
+        (c == &#39;\n&#39;) ||
+        (c == &#39;\v&#39;) ||
+        (c == &#39;\f&#39;) ||
+        (c == &#39;\r&#39;);
+}
+</code></pre>
+<p>Notice the <em>constexpr</em> keyword as well as the fact that all types used (char) are constexpr-friendly. The actual ‘business logic’ is self-explanatory.</p>
+<p>Moving on and focusing on our goal, the function we want to implement takes one <strong>compiletime::string</strong>, iterates over it, and removes consecutive white-space and newlines. This can be done via a simple for-loop, with <strong>push_back</strong> calls appending the preserved characters to a new <strong>compiletime::string</strong> instance. A few predicates allow us to keep track of the parser state. Check it out:</p>
+<pre><code class="language-c++">template&lt;std::size_t N&gt;
+constexpr auto truncateWhitespace(compiletime::string&lt;N&gt; str) {
+    // Need to use non-type template for string max size
+    compiletime::string&lt;N&gt; result;
+    bool previousIsWhitespace = false; // Keep track if the previous character was whitespace
+    for(char c : str) {
+        // Skip new lines
+        if(c == &#39;\n&#39;) {
+            continue;
+        } else if(is_whitespace(c)) {
+            // If the last character was whitespace, continue interation
+            if(previousIsWhitespace) {
+                continue;
+            }
+            // Whitespace: Set flag
+            previousIsWhitespace = true;
+        } else {
+            // Not whitespace: Reset flag
+            previousIsWhitespace = false;
+        }
+
+        result.push_back(c); // Otherwise; add character to new string
+    }
+    return result;
+}
+</code></pre>
+<p>And finally, we can provide a simple overload to allow direct string literal use:</p>
+<pre><code class="language-c++">template&lt;std::size_t N&gt;
+constexpr auto truncateWhitespace(const char (&amp;str)[N])
+{
+    compiletime::string&lt;N&gt; tmp(str); // build instance
+    return truncateWhitespace(tmp); // run function
+}
+</code></pre>
+<h2 id="the-spoils">The Spoils</h2>
+<p>Now, we can actually use this construct in our code:</p>
+<pre><code class="language-c++">constexpr auto query = R&quot;(
+    SELECT
+        u.id,
+        u.user_name,
+        u.ref_id,
+        u.postal_code,
+        u.email,
+        o.transaction.id
+    FROM
+        users u
+    JOIN
+        orders o ON o.user_id = u.id
+    WHERE
+        u.id=? AND u.active=?
+)&quot;;
+
+constexpr auto trucatedQuery = truncateWhitespace(query);
+std::cout &lt;&lt; trucatedQuery;
+// output:
+// &quot; SELECT u.id, u.user_name, u.ref_id, u.postal_code, u.email, o.transaction.id FROM users u JOIN orders o ON o.user_id = u.id WHERE u.id=? AND u.active=? &quot;
+</code></pre>
+<p>The new query length is <strong>154 characters</strong>! Which beats obviously beats the original raw literal (294) and the old “spaces before and after” mantra with traditional one-line string literals (162). And we can validate that this is actually happening at compile time with a <a href="https://www.google.com/search?channel=fs&amp;client=ubuntu&amp;q=static+assert">static_assert</a>. If you are using a modern IDE/Editor with C++ integration the following statement will actually be highlighted as a failed assertion before running compilation:</p>
+<pre><code>static_assert(trucatedQuery.size() == 154);
+</code></pre>
+<p>We have succeeded and in the process gained advantages over both previous approaches:</p>
+<ul>
+<li><strong>Clearer and less cluttered code site</strong>: Freedom to use raw string literals to format queries with as much indentation as you’d like.</li>
+<li><strong>Neater, Compact Logging</strong>: New lines scattered in log files make them harder to parse and understand.</li>
+<li><strong>Less Network Bandwidth Usage</strong>: If you are using a database that directly accepts the query string, you will be sending half the bytes over the network.</li>
+<li><strong>Faster Performance</strong>: If you do any local string validation/processing/formatting, you will gain some performance.</li>
+</ul>
+<p>For the sake of it, I did a simple benchmark comparing the generated <strong>compile_time::string</strong> buffer to a <strong>const char</strong>* with the exact same literal. On my system, iterating over the provided string using a simple pointer and while loop resulted in consistently faster performance averaged over many iterations. I would be greatly concerned if it didn’t, as there is now half as many characters as before! A simple O(N) iteration operation will obviously be faster on less elements.</p>
+<p>I can see this technique providing excellent payoff for queries with many joins and deeper indentation (maybe in a lambda inside a class member function or something), sent over the network and parsed on a regular, frequent basis. It’s also just feels great, knowing you’ve reached the holy grail of performance; aka compile time operations.</p>
+<h2 id="limitations">Limitations</h2>
+<p>There is one obvious limitation of this approach. Even though the ‘string’ value is shortened, we pack a buffer of the original size into the executable, padded with zeroes at the end of the string. This is because the final string size is needed as a compile time template value to construct the string class. Unfortunately, once we’re inside the <strong>truncateWhitespace</strong> function, we can’t retrieve the length to use with the string type. We also can’t make any assumptions about what the final size will be as there may not be any superfluous white-space (A simple N / 2 estimate could result in compilation failures in some cases). You could solve this this by implementing a constexpr function to calculate the final length before doing the actual truncation. Something like this:</p>
+<pre><code class="language-c++">constexpr const char originalQuery[] = R&quot;(...)&quot;;
+constexpr std::size_t slimmedSize = calculateTruncatedWhitespaceSize(originalQuery);
+constexpr auto trucatedQuery = truncateWhitespace&lt;slimmedSize&gt;(originalQuery);
+</code></pre>
+<p>I cannot currently think of a way to do this in a way does not leverage a macro, as we can’t create function to wrap this functionality, since the arguments would not be considered constexpr inside and therefore could not be used calculate a constexpr length to be provided as a non-type template parameter to the string class. Please let me know if you can suggest a technique or trick!</p>
+<p>Another limitation is using string literals within the SQL itself. Luckily, this can be mitigated by enhancing the parser to keep track if the current point of iteration is within a string literal or not.</p>
+<h2 id="in-closing">In Closing</h2>
+<p>Though the performance gains are negligible in most cases, this approach provides real benefits in clarity, logging and efficiency. You can leverage this same technique to do any kind of string pre-processing at compile time as needed.</p>
+<p><a href="https://gist.github.com/dgski/810ede7c4a80917c0adc99c6852fee9a">Link to Complete Code</a></p>
+
+            ]]>
+        </content>
+    </entry>
+    <entry>
+        <title>Using C++17 to Create Composable, Recursive Data Types</title>
+        <author>
+            <name>David Gorski</name>
+        </author>
+        <link href="https://tech.davidgorski.ca/using-c17-to-create-composable-recursive-data-types.html"/>
+        <id>https://tech.davidgorski.ca/using-c17-to-create-composable-recursive-data-types.html</id>
+            <category term="Types"/>
+            <category term="C++"/>
+
+        <updated>2023-07-29T14:30:57-04:00</updated>
+            <summary></summary>
+        <content type="html">
+            <![CDATA[
+                <p>This article presents a simple way to cleanly define nested, multi-branch type hierarchies using C++17. An endeavour which was much messier in older versions of C++. This can be altered and modified to generated pure schemas, new data types, and anything tree based. It leverages <a href="https://en.cppreference.com/w/cpp/utility/variant">std::variant</a> to cleanly express a cohesive approach to designing easily composed data structures.</p>
+<p>The final result will allow us to easily define N-Arity tree instances with clear, nested object instance declaration. For example:</p>
+<pre><code class="language-c++">auto root =
+    Node(&quot;addUserRequest&quot;,
+        Sequence({
+            Node(&quot;userId&quot;, 123),
+            Node(&quot;name&quot;, &quot;Charles&quot;),
+            Node(&quot;age&quot;, 424),
+            Node(&quot;sessionInfo&quot;,
+                Sequence({
+                    Node(&quot;signOnId&quot;, &quot;f1f133112&quot;),
+                    Node(&quot;bannerId&quot;, Null())}))}));
+</code></pre>
+<h2 id="declaring-our-building-blocks">Declaring Our Building Blocks</h2>
+<p>In order to get started, we need to declare the fundamental types that will allows to construct this tree system. These will include our ‘simple’, scalar data types which hold concrete data on each node: int, string, null. As well as our ‘complex’, composite data types: an ordered sequence and a <a href="https://en.cppreference.com/w/cpp/utility/variant">variant</a> representing the alternative data types each node can hold.</p>
+<pre><code class="language-c++">// Forward Declaration of Tree Node
+struct Node;
+
+// Simple 
+using Int = int;
+using String = std::string;
+using Null = std::monostate;
+
+// Composite
+using Sequence = std::vector&lt;Node&gt;;
+using Data = std::variant&lt;Int, String, Null, Sequence&gt;;
+</code></pre>
+<p>With these type declarations out of the way, our data hierarchy is starting to take shape. Some explanations:</p>
+<ul>
+<li>We forward declare our <strong>Node</strong> class, so that the Sequence type can be aware of it.</li>
+<li>We create aliases for Int, String and Null.</li>
+<li>We declare an alias for the Sequence type: a vector of Nodes. </li>
+<li>Finally, we declare the <strong>Data</strong> class. Each <strong>Node</strong> element will use a data member to hold either an Int, String, Null, or a Sequence of other Nodes.</li>
+</ul>
+<h2 id="the-node-class">The Node Class</h2>
+<p>Now let’s define the Node data type: </p>
+<pre><code class="language-c++">struct Node {
+    std::string m_name;
+    Data m_data;
+    explicit Node(std::string&amp;&amp; name, Data&amp;&amp; data)
+        : m_name(std::move(name)), m_data(std::move(data)) {}
+};
+</code></pre>
+<p>The above definition has two member variables:</p>
+<ul>
+<li><strong>m_name</strong>: A string used to name the node’s ‘field’.</li>
+<li><strong>m_data</strong>: The data the node is holding. Defined as a variant above.</li>
+</ul>
+<p>It also has a single explicit constructor which takes the node name and the data it holds as <a href="https://www.learncpp.com/cpp-tutorial/rvalue-references/">R-value references</a>. Which means data will moved from the incoming instances if possible. If you plan to use this with variables or make copies, more constructors will have to be defined.</p>
+<p>Surprisingly, that’s it! Really. We can already build trees using the syntax demonstrated at the top of the article. Allowing us to develop nested hierarchies dynamically (but with type safety). Notice how the variant constructor accepts each type as needed to initialize the data member.</p>
+<pre><code class="language-c++">auto root =
+    Node(&quot;data&quot;, Sequence({
+        Node(&quot;users&quot;, Sequence({
+            Node(&quot;david&quot;, 12322),
+            Node(&quot;charles&quot;, 2322),
+            Node(&quot;rebecca&quot;, 998)})),
+        Node(&quot;citySize&quot;, Sequence({
+            Node(&quot;nyc&quot;, 8),
+            Node(&quot;toronto&quot;, 4)}))}));
+</code></pre>
+<h2 id="traversing-the-structure">Traversing The Structure</h2>
+<p>Of course, with no way to traverse the structure, it’s useless. Let’s define output stream operators so that we can ‘serialize’ the data structure to <strong>stdout</strong>.</p>
+<p>First let’s do an overload for the <strong>Null</strong> type:</p>
+<pre><code class="language-c++">template&lt;typename Stream&gt;
+Stream&amp; operator&lt;&lt;(Stream&amp; stream, const Null&amp; null) {
+    stream &lt;&lt; &quot;null&quot;;
+    return stream;
+}
+</code></pre>
+<p>Very simple. Next let’s overload it for the <strong>Data</strong> (variant) type:</p>
+<pre><code class="language-c++">template&lt;typename Stream&gt;
+Stream&amp; operator&lt;&lt;(Stream&amp; stream, const Data&amp; data) {
+    std::visit([&amp;](auto&amp; val) {
+        stream &lt;&lt; val;
+    }, data);
+    return stream;
+}
+</code></pre>
+<p>Here, we are using <a href="https://en.cppreference.com/w/cpp/utility/variant/visit">std::visit</a> to access the variant as it’s current type. Using an auto template lambda keeps things concise. Inside, we simply apply the stream out operator to whatever is in the variant at the time (Int, Null, etc..).</p>
+<p>Next, we can overload the stream operator for the <strong>Node</strong> type. Again, this definition is simple:</p>
+<pre><code class="language-c++">template&lt;typename Stream&gt;
+Stream&amp; operator&lt;&lt;(Stream&amp; stream, const Node&amp; node) {
+    std::cout
+        &lt;&lt; &quot;Node{ name=&#39;&quot; &lt;&lt; node.m_name
+        &lt;&lt; &quot;&#39; data=&quot; &lt;&lt; node.m_data &lt;&lt; &quot; }&quot;;
+    return stream;
+}
+</code></pre>
+<p>So far, so good! However, we are missing the crucial overload for <strong>Sequence</strong> (std::vector). Why is this so important? It is what enables the actual traversing to deeper levels. Look carefully:</p>
+<pre><code class="language-c++">template&lt;typename Stream&gt;
+Stream&amp; operator&lt;&lt;(Stream&amp; stream, const Sequence&amp; data) {
+    std::cout &lt;&lt; &quot;Sequence[ &quot;;
+    for(const auto&amp; d : data) {
+        std::cout &lt;&lt; d &lt;&lt; &#39; &#39;;
+    }
+    std::cout &lt;&lt; &#39;]&#39;;
+    return stream;
+}
+</code></pre>
+<p>For each child Node in the sequence we use the stream out operator. And this prints out their value. What if a child node is a sequence? Well then the same operator will be called recursively as needed. Viola! We can serialize our data:</p>
+<pre><code class="language-c++">auto root2 =
+    Node(&quot;test&quot;,
+        Sequence({
+            Node(&quot;name&quot;, &quot;Herbert&quot;),
+            Node(&quot;age&quot;, 55)}));
+
+// prints out:
+// Node{ name=&#39;test&#39; data=Sequence[ Node{ name=&#39;name&#39; data=Herbert } Node{ name=&#39;age&#39; data=55 } ] }
+std::cout &lt;&lt; root2 &lt;&lt; std::endl;
+</code></pre>
+<h2 id="programmatically-generating-structure-segments">Programmatically Generating Structure Segments</h2>
+<p>We have a pretty usable and extensible system already. However, what if we want to transform a vector of custom structs into a canonical <strong>Sequence</strong> in our simple tree data system? All we need to do is write a utility function that iterates over the vector to produce a sequence:</p>
+<pre><code class="language-c++">template&lt;typename T, typename Func&gt;
+Sequence vecToSeq(const std::vector&lt;T&gt;&amp; vec, Func func) {
+    Sequence result;
+    for(const auto&amp; v : vec) {
+        result.push_back(func(v));
+    }
+    return result;
+}
+</code></pre>
+<p>Now, we can use this function with a custom function argument to define the structure that will be appended for each data member within the vector:</p>
+<pre><code class="language-c++">// Define custom type
+struct Custom {
+    int id;
+    std::string name;
+};
+
+// Create vector
+std::vector&lt;Custom&gt; vec = {
+    {12, &quot;Johnny&quot;}, { 344, &quot;Filber&quot;}, {999, &quot;Jennifer&quot;}
+};
+
+// Use lambda to process each item in vector and output reflecting Node data structure
+auto root3 =
+    Node(&quot;data&quot;, Sequence({
+        Node(&quot;customThings&quot;, vecToSeq(vec, [](const Custom&amp; c) {
+            return Node(&quot;custom&quot;, Sequence({
+                Node(&quot;id&quot;, c.id),
+                Node(&quot;name&quot;, c.name)})); })),
+        Node(&quot;requestId&quot;, 232324)}));
+</code></pre>
+<p>This idea can be expanded to create <strong>toTree()</strong> functions for different types. Perhaps as an exercise, one could generalize the <strong>toTree()</strong> function for all types to allow automatic conversion without direct function calls.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>As you can see, Modern C++ really improves the ability to work with composable data types using utility types such as <a href="https://en.cppreference.com/w/cpp/utility/variant">std::variant</a>. The example presented in this post, provides a simple blueprint for more specific systems. It can extended and modified to support different schema definitions, serialization, and validation. Maybe you want just types with no names? Or a schema with no concrete data? Hopefully this serves a good starting point to direct your thinking. If the curly braces bother you, you play around with template parameter packs. And if you can get by with exclusively compile time generation, maybe you can experiment with using tuples to store the sequences. Have fun!</p>
+<p><a href="https://gist.github.com/dgski/d00303b4a8be2d3c109d7a97d77106a3">Link to Complete Code Example</a></p>
+
+            ]]>
+        </content>
+    </entry>
+    <entry>
         <title>A Simple Personal Data Backup Setup</title>
         <author>
             <name>David Gorski</name>
         </author>
-        <link href="https://tech.davidgorski.ca/a-simple-personal-data-backup-setup.html"/>
-        <id>https://tech.davidgorski.ca/a-simple-personal-data-backup-setup.html</id>
+        <link href="https://tech.davidgorski.ca/a-simple-personal-data-backup-setup-2.html"/>
+        <id>https://tech.davidgorski.ca/a-simple-personal-data-backup-setup-2.html</id>
+            <category term="Linux"/>
+            <category term="Backup"/>
 
-        <updated>2023-05-20T15:54:16-04:00</updated>
+        <updated>2023-07-29T14:29:47-04:00</updated>
             <summary></summary>
         <content type="html">
             <![CDATA[
-                <div>
-<div>Until recently, my only computer was a 2013 MacBook Air. I backed it up using the included Time Machine system and an external spinning disk hard drive. With the nature of it being a laptop, I didn't have the external drive plugged in all the time, and so I set a calendar reminder to do a weekly backup because I knew I wouldn't do it daily. It's embarrassing to admit that even as a 'tech professional', there were plenty of weeks that I skipped backing up my content. I was used to the computer working all the time, I was busy and I always had some excuse to ignore the reminders. MacOS Notifications would beg me to do something:</div>
-<br>
-<div>```</div>
-<div>It has been 3 weeks since you backed up your computer! You're asking for data loss chump!</div>
-<div>```</div>
-<br>
-<div>It's pretty obvious that in order for it to function properly, you need an automatic backup system. Otherwise, human complacency and laziness take over. Your data needs to be backed up without any input from you. Having recently undertaken an initiative to upgrade and enhance my personal technology setup, I knew I could do better.</div>
-<br>
-<div>## My Overall Requirements</div>
-<div>1. Multiple copies of my data to survive hardware/software failure.</div>
-<div>2. Live data synchronization between my MacBook and new Linux Workstation.</div>
-<div>3. Snapshots available for restore.</div>
-<div>4. Remote copies of my data.</div>
-<br>
-<div>## The Guiding Principle - 3,2,1</div>
-<div>This is something that is obvious, but it really is the bare minimum, even for your personal data. The [3,2,1 rule](https://us-cert.cisa.gov/sites/default/files/publications/data_backup_options.pdf) states that you need:</div>
-<br>
-<div>- **3 backups**: 3 total copies of your data.</div>
-<div>- **2 local**: 2 locally available copies.</div>
-<div>- **1 remote**: 1 off-site copy.</div>
-<br>
-<div>If you satisfy these requirements, your chance of data loss is incredibly slim.</div>
-<br>
-<div>## Local First</div>
-<div>There are many fancy approaches to create local, automatic, backup systems. Fundamentally, they lean on having a dedicated device, on-prem, holding your data. These options included:</div>
-<br>
-<div>- Purpose-built Network Attached Storage with multiple storage bays</div>
-<div>- Raspberry Pi with added hardware</div>
-<div>- Full Data Server</div>
-<br>
-<div>For my needs, these were a little overkill. I wasn't planning on using my backup as a streaming source or personal media server. I just really needed my data to be synchronized between my Macbook and my Linux Workstation. Surely there must be a simple solution for this? Luckily for me, I found [Syncthing](https://syncthing.net/). I am very satisfied with the operational simplicity of this tool. I can just point the app to my data folder on each device, and it does the rest. The included ignore pattern functionality is also very useful in reducing the synchronization data volume amount. The nice effect of live synchronization is that the data changes are immediately reflected on the other machine.</div>
-<br>
-<div>However, even though live synchronization maintains two copies of my data it is **not** a replacement for true backups! What if the data became corrupted on one device? The daemon would sync this corruption to the other device and I would lose content! This is what **versioned backups** prevent by creating snapshots of your data at certain points in time. Because my use case is simple, I am delegating versioned backups to the remote backup element.</div>
-<br>
-<div>## Remote Backups</div>
-<div>With a live synchronization system working locally, I set out to add a remote backup portion to the setup. My personal stuff is not mission-critical. Maybe yours is, but mine isn't, so a remote backup frequency of once per day was enough. Anyways, I settled on the following requirements:</div>
-<br>
-<div>1. **Inexpensive**: I don't want to break the bank.</div>
-<div>2. **Encrypted**: I'm not a privacy nut, but something still feels wrong about giving someone else carte blanche access to my data.</div>
-<div>3. **Scheduled**: I would like this backup to run once a day.</div>
-<div>4. **Open-Source**: This is important for two reasons: I don't want to be locked-in and I want to be sure the app does what it says it does.</div>
-<br>
-<div>To make a long story short; I ended up using [anacron](https://en.wikipedia.org/wiki/Anacron) and [duplicity](http://duplicity.nongnu.org/) with [Backblaze B2](https://www.backblaze.com/b2/cloud-storage.html) on my Linux Workstation.</div>
-<br>
-<div>**Anacron** allows task scheduling for devices that are not always on. So if you schedule something to run once a day, as long as your computer is on for a portion of the day; it will run.</div>
-<br>
-<div>**Duplicity** is an amazing all-in-one encryption and upload command-line backup tool. It supports full and partial backups along with support for most cloud providers. I set it up to delete the partial incremental backups after 30 days and do a full backup to save space in the long run.</div>
-<br>
-<div>**Backblaze B2** is an solid, inexpensive online storage provider. It provided all the features I needed and is compatible with duplicity out of the box.</div>
-<br>
-<div>The following is templated copy of my backup script. Please note the **firefox profile backup** and the use of **systemd-inhibit** to prevent shutting down the computer while the backup is in progress:</div>
-<br>
-<div>```bash</div>
-<div># Sync firefox profile into data folder</div>
-<div>rsync -a {{FIRFOX_FOLDER}} {{DATA_FOLDER}}</div>
-<br>
-<div># Push latest changes to cloud</div>
-<div>systemd-inhibit --why="Daily Backup In-Progress" duplicity \</div>
-<div>--verbosity 8 \</div>
-<div>{{DATA_FOLDER}}\</div>
-<div>{{CLOUD_ENPOINT_AND_API_KEY}} \</div>
-<div>--asynchronous-upload\</div>
-<div>--full-if-older-than 1M \</div>
-<div>--allow-source-mismatch\</div>
-<div>&gt;&gt; {{LOG_FILE}}</div>
-<div> </div>
-<div>echo "personal backup complete ($(date))" &gt;&gt; {{LOG_FILE}}</div>
-<div>```</div>
-<br>
-<div>## Epilogue</div>
-<div>Since setting up this system, not a single part of has failed. And maybe, it never will. But I am no longer embarrassed of my backup system and I sleep a little better at night. Please take this as a reminder to back your important stuff up. Hopefully you'll never have to thank me!</div>
-</div>
+                <p>Until recently, my only computer was a 2013 MacBook Air. I backed it up using the included Time Machine system and an external spinning disk hard drive. With the nature of it being a laptop, I didn’t have the external drive plugged in all the time, and so I set a calendar reminder to do a weekly backup because I knew I wouldn’t do it daily. It’s embarrassing to admit that even as a ‘tech professional’, there were plenty of weeks that I skipped backing up my content. I was used to the computer working all the time, I was busy and I always had some excuse to ignore the reminders. MacOS Notifications would beg me to do something:</p>
+<pre><code>It has been 3 weeks since you backed up your computer! You&#39;re asking for data loss chump!
+</code></pre>
+<p>It’s pretty obvious that in order for it to function properly, you need an automatic backup system. Otherwise, human complacency and laziness take over. Your data needs to be backed up without any input from you. Having recently undertaken an initiative to upgrade and enhance my personal technology setup, I knew I could do better.</p>
+<h2 id="my-overall--requirements">My Overall  Requirements</h2>
+<ol>
+<li>Multiple copies of my data to survive hardware/software failure.</li>
+<li>Live data synchronization between my MacBook and new Linux Workstation.</li>
+<li>Snapshots available for restore.</li>
+<li>Remote copies of my data.</li>
+</ol>
+<h2 id="the-guiding-principle---321">The Guiding Principle - 3,2,1</h2>
+<p>This is something that is obvious, but it really is the bare minimum, even for your personal data. The <a href="https://us-cert.cisa.gov/sites/default/files/publications/data_backup_options.pdf">3,2,1 rule</a> states that you need:</p>
+<ul>
+<li><strong>3 backups</strong>: 3 total copies of your data.</li>
+<li><strong>2 local</strong>: 2 locally available copies.</li>
+<li><strong>1 remote</strong>: 1 off-site copy.</li>
+</ul>
+<p>If you satisfy these requirements, your chance of data loss is incredibly slim.</p>
+<h2 id="local-first">Local First</h2>
+<p>There are many fancy approaches to create local, automatic, backup systems. Fundamentally, they lean on having a dedicated device, on-prem, holding your data. These options included:</p>
+<ul>
+<li>Purpose-built Network Attached Storage with multiple storage bays</li>
+<li>Raspberry Pi with added hardware</li>
+<li>Full Data Server</li>
+</ul>
+<p>For my needs, these were a little overkill. I wasn’t planning on using my backup as a streaming source or personal media server. I just really needed my data to be synchronized between my Macbook and my Linux Workstation. Surely there must be a simple solution for this? Luckily for me, I found <a href="https://syncthing.net/">Syncthing</a>. I am very satisfied with the operational simplicity of this tool. I can just point the app to my data folder on each device, and it does the rest. The included ignore pattern functionality is also very useful in reducing the synchronization data volume amount. The nice effect of live synchronization is that the data changes are immediately reflected on the other machine.</p>
+<p>However, even though live synchronization maintains two copies of my data it is <strong>not</strong> a replacement for true backups! What if the data became corrupted on one device? The daemon would sync this corruption to the other device and I would lose content! This is what <strong>versioned backups</strong> prevent by creating snapshots of your data at certain points in time. Because my use case is simple, I am delegating versioned backups to the remote backup element. </p>
+<h2 id="remote-backups">Remote Backups</h2>
+<p>With a live synchronization system working locally, I set out to add a remote backup portion to the setup. My personal stuff is not mission-critical. Maybe yours is, but mine isn’t, so a remote backup frequency of once per day was enough. Anyways, I settled on the following requirements:</p>
+<ol>
+<li><strong>Inexpensive</strong>: I don’t want to break the bank.</li>
+<li><strong>Encrypted</strong>: I’m not a privacy nut, but something still feels wrong about giving someone else carte blanche access to my data. </li>
+<li><strong>Scheduled</strong>: I would like this backup to run once a day.</li>
+<li><strong>Open-Source</strong>: This is important for two reasons: I don’t want to be locked-in and I want to be sure the app does what it says it does.</li>
+</ol>
+<p>To make a long story short; I ended up using <a href="https://en.wikipedia.org/wiki/Anacron">anacron</a> and <a href="http://duplicity.nongnu.org/">duplicity</a> with <a href="https://www.backblaze.com/b2/cloud-storage.html">Backblaze B2</a> on my Linux Workstation.</p>
+<p><strong>Anacron</strong> allows task scheduling for devices that are not always on. So if you schedule something to run once a day, as long as your computer is on for a portion of the day; it will run.</p>
+<p><strong>Duplicity</strong> is an amazing all-in-one encryption and upload command-line backup tool. It supports full and partial backups along with support for most cloud providers. I set it up to delete the partial incremental backups after 30 days and do a full backup to save space in the long run.</p>
+<p><strong>Backblaze B2</strong> is an solid, inexpensive online storage provider. It provided all the features I needed and is compatible with duplicity out of the box.</p>
+<p>The following is templated copy of my backup script. Please note the <strong>firefox profile backup</strong> and the use of <strong>systemd-inhibit</strong> to prevent shutting down the computer while the backup is in progress:</p>
+<pre><code class="language-bash"># Sync firefox profile into data folder
+rsync -a {{FIRFOX_FOLDER}} {{DATA_FOLDER}}
+
+# Push latest changes to cloud
+systemd-inhibit --why=&quot;Daily Backup In-Progress&quot; duplicity \
+    --verbosity 8 \
+    {{DATA_FOLDER}} \
+    {{CLOUD_ENPOINT_AND_API_KEY}} \
+    --asynchronous-upload \
+    --full-if-older-than 1M \
+    --allow-source-mismatch \
+    &gt;&gt; {{LOG_FILE}}
+    
+echo &quot;personal backup complete ($(date))&quot; &gt;&gt; {{LOG_FILE}}
+</code></pre>
+<h2 id="epilogue">Epilogue</h2>
+<p>Since setting up this system, not a single part of has failed. And maybe, it never will. But I am no longer embarrassed of my backup system and I sleep a little better at night. Please take this as a reminder to back your important stuff up. Hopefully you’ll never have to thank me!</p>
+
+            ]]>
+        </content>
+    </entry>
+    <entry>
+        <title>Concise Result Extraction in Modern C++</title>
+        <author>
+            <name>David Gorski</name>
+        </author>
+        <link href="https://tech.davidgorski.ca/concise-result-extraction-in-modern-c.html"/>
+        <id>https://tech.davidgorski.ca/concise-result-extraction-in-modern-c.html</id>
+            <category term="Functional Programming"/>
+            <category term="C++"/>
+
+        <updated>2023-07-29T14:28:24-04:00</updated>
+            <summary></summary>
+        <content type="html">
+            <![CDATA[
+                <p>A popular idiom in <strong>functional programming</strong> is the use of <a href="https://en.wikipedia.org/wiki/Algebraic_data_type">sum types</a> to express results or optional values. When a function returns, it either succeeded and we get the result, or it failed and we have an error on our hands. This is a pattern in Modern C++ as well, enabled by standard library types such as <a href="https://en.cppreference.com/w/cpp/utility/variant">std::variant</a> and <a href="https://en.cppreference.com/w/cpp/utility/optional">std::optional</a>. In this article we will explore how to improve the ergonomics of handling multiple results and potential error values.</p>
+<h2 id="the-result-type">The ‘Result’ Type</h2>
+<p>For the purpose of this example we will define a simple ‘Result’ type: a variant that is either an ‘Error’ or a templated Type:</p>
+<pre><code class="language-c++">struct Error {
+    std::string message;
+    Error(std::string _message) : message(std::move(_message)) {}
+};
+template&lt;typename Type&gt;
+using Result = std::variant&lt;Error, Type&gt;;
+</code></pre>
+<p>Now we can define functions that either succeed and return a specified type, or an Error object which holds a message:</p>
+<pre><code class="language-c++">Result&lt;int&gt; getCloudInteger(Cloud&amp; cloud) {
+    if(!cloud.ok()) {
+        return Error(cloud.get_error_message());
+    }
+
+    return cloud.get_int();
+}
+</code></pre>
+<h2 id="getting-results">Getting Results</h2>
+<p>This a pretty neat and clear interface, however, as with many operations we may be performing multiple operations that may success or fail. This results in a growing amount of boilerplate in the business logic code. Even when using a overloaded + operator for combining errors:</p>
+<pre><code class="language-c++">auto res1 = getCloudInteger(cloud1);
+auto res2 = getCloudInteger(cloud2);
+auto res3 = getCloudInteger(cloud3);
+if(is_error(res1 &amp;&amp; is_error(res2) &amp;&amp; is_error(res3)) {
+    return get_error(res1) + get_error(res2) + get_error(res3);
+} else if(is_error(res1) &amp;&amp; is_error(res2)) {
+    return get_error(res1) + get_error(res2);
+} else if(is_error(res1) &amp;&amp; is_error(res3)) {
+    return get_error(res1) + get_error(res3);
+} else if(is_error(res1)) {
+    return get_error(res1);
+} else if(is_error(res2)) {
+    return get_error(res2);
+} else if(is_error(res3)) {
+    return get_error(res3);
+}
+auto val1 = get_ok(res1);
+auto val2 = get_ok(res2);
+auto val3 = get_ok(res3);
+</code></pre>
+<p><em>Note: is_error, get_error and get_ok are simple utility functions wrapping std::get<int> and std::holds_alternative</em></p>
+<p>As the number of results we are processing increases, more and more lines of code are to be added. Obviously, it is best to keep your business logic as clear and uncluttered from ‘implementation-level’ concerns are possible. So how can we do this better? Modern C++ gives us template parameter packs, which allows to type-safe, variable argument functions with derived return types. We will leverage them to iterate over all the results and consolidate any errors.</p>
+<h2 id="using-parameter-packs">Using Parameter Packs</h2>
+<p>Parameter packs are often iterated via recursion (especially before C++17). So to start we will define two overloaded functions:</p>
+<ul>
+<li>One that takes only a distinct result type.</li>
+<li>One that takes a distinct result type and a pack argument.</li>
+</ul>
+<pre><code class="language-c++">template&lt;typename Type&gt;
+auto get_all(Result&lt;Type&gt;&amp; r) -&gt; ?;
+
+template&lt;typename Type, typename... Types&gt;
+auto get_all(Result&lt;Type&gt;&amp; r, Types&amp;... rest) -&gt; ?;
+</code></pre>
+<p>Now, we must determine a suitable return value interface for this operation. We can use our Result type, as it already provides a value or error paradigm. What should be the success type within the Result? Since we want this function to be used generically we don’t want a class with named member types. And using a standard library container type (such as std::vector) would add unnecessary overhead. Using a <a href="https://en.cppreference.com/w/cpp/utility/tuple">std::tuple</a> with the same result order as the provided pack is the best option. This also provides compatibility with very convenient syntax sugar such as <a href="https://en.cppreference.com/w/cpp/utility/tuple/tie">std::tie</a> and <a href="https://en.cppreference.com/w/cpp/language/structured_binding">C++17 structure bindings</a>.</p>
+<p>Let define our single argument <strong>get_all</strong> function first:</p>
+<pre><code class="language-c++">template&lt;typename Type&gt;
+auto get_all(Result&lt;Type&gt;&amp; r) -&gt; Result&lt;std::tuple&lt;Type&gt;&gt; {
+    if(is_error(r)) {
+        return get_error(r);
+    }
+    return std::make_tuple(get_ok(r));
+}
+</code></pre>
+<p>This is one is easy. The return type is simply a Result of <strong>std::tuple</strong> composed of one value: the results success type. If the result contains an error we simple return that error. Otherwise we get the value, stuff it in a tuple and stuff that tuple in a Result.</p>
+<p>The variable argument version is a little more tricky. We will have to leverage some Modern C++ to implement it properly. First we need to determine the return type for the signature. Again, the overarching type is the Result type. What is the success type? A tuple of all the success types of all the provided Result arguments. We need to extract that by feeding some tuple utility function faux calls to the <a href="https://en.cppreference.com/w/cpp/language/decltype">decltype</a> specifier.</p>
+<pre><code class="language-c++">template&lt;typename Type, typename... Types&gt;
+auto get_all(Result&lt;Type&gt;&amp; r, Types&amp;... rest)
+-&gt; Result&lt;decltype(std::tuple_cat(std::make_tuple(get_ok(r)), get_ok(get_all(rest...))))&gt;
+</code></pre>
+<p>Whew! Quite a bit! Although, if you’re used to C++, you will actually find that signature to be pretty clear. The <strong>decltype</strong> specifier simply “returns” the type of the expression it is provided. In this case we are saying:</p>
+<ul>
+<li><strong>decltype</strong>: Get me the type of this expression</li>
+<li><strong>std::tuple_cat</strong>: Concatenate these tuples.</li>
+<li><strong>std::make_tuple</strong>: Make a tuple with these arguments. We provide one argument: the success result of the provided first argument.</li>
+<li><strong>get_ok(get_all(res…))</strong>: Get the success result of getting the combined result of all arguments except the first one (the return type of this function call is Result of std::tuple&lt;…&gt;)</li>
+</ul>
+<p>Here is final body:</p>
+<pre><code class="language-c++">template&lt;typename Type, typename... Types&gt;
+auto get_all(Result&lt;Type&gt;&amp; r, Types&amp;... rest)
+-&gt; Result&lt;decltype(std::tuple_cat(std::make_tuple(get_ok(r)), get_ok(get_all(rest...))))&gt; {
+    auto restRes = get_all(rest...);
+    if(is_error(r) &amp;&amp; is_error(restRes)) {
+        return get_error(r) + get_error(restRes);
+    } else if(is_error(r)) {
+        return get_error(r);
+    } else if(is_error(restRes)) {
+        return get_error(restRes);
+    }
+
+    return std::tuple_cat(std::make_tuple(get_ok(r)), get_ok(restRes));
+}
+</code></pre>
+<p>The function body is a lot simpler once we know what we are returning. First we recursively call get_all on the argument except the first one. Then we check their error status. If both are errors, we combine the errors using an overloaded + operator, if only the current result is an error we return that error, otherwise we return the consolidated error from the consecutive arguments. If there are no errors at all, we concatenate a tuple comprised of the first result and the tuple returned from the recursive call on the remaining arguments. Viola!</p>
+<h2 id="finale">Finale</h2>
+<p>Now we can ergonomically and concisely extract results and check for errors:</p>
+<pre><code class="language-c++">auto res1 = getCloudInteger(cloud1);
+auto res2 = getCloudInteger(cloud2);
+auto res3 = getCloudInteger(cloud3);
+auto aggregate_res = get_all(res1, res2, res3);
+if(is_error(aggregate_res)) {
+    return get_error(aggregate_res);
+}
+auto [val1, val2, val3] = get_ok(aggregate_res);
+</code></pre>
+<p>This can be further refined and modified to suit your needs. Perhaps you can use an R-Value Reference argument signature and eliminate the need for the temporary Result variables:</p>
+<pre><code class="language-c++">auto aggregate_res = get_all(
+    getCloudInteger(cloud1), getCloudInteger(cloud2), getCloudInteger(cloud3));
+if(is_error(aggregate_res)) {
+    return get_error(aggregate_res);
+}
+auto [val1, val2, val3] = get_ok(aggregate_res);
+</code></pre>
+<p>Or, if you prefer exception-based error handling but are dealing with a functional interface, you can simply throw exceptions within a get_all wrapper, eliminating even more boilerplate:</p>
+<pre><code class="language-c++">auto [val1, val2, val3] = get_all_vals(
+    getCloudInteger(cloud1), getCloudInteger(cloud2), getCloudInteger(cloud3)
+</code></pre>
+<p>Modern C++ Parameter Packs and error handling allow for cleaner call sites around your business logic. Writing a simple helper function like this is not difficult and can reduce the number of lines of code while allowing you to express your ideas and control flow more cleanly. This is especially useful for <strong>std::async and std::future</strong> and other libraries like it.</p>
+<p><a href="https://gist.github.com/dgski/df5d7dcfc77031f79675f3b50565a051">Link to Complete Code Example</a></p>
+
+            ]]>
+        </content>
+    </entry>
+    <entry>
+        <title>Five Web Project Lessons</title>
+        <author>
+            <name>David Gorski</name>
+        </author>
+        <link href="https://tech.davidgorski.ca/five-web-project-lessons.html"/>
+        <id>https://tech.davidgorski.ca/five-web-project-lessons.html</id>
+            <category term="Webapp"/>
+            <category term="Project"/>
+            <category term="Programming"/>
+
+        <updated>2023-07-29T14:29:15-04:00</updated>
+            <summary></summary>
+        <content type="html">
+            <![CDATA[
+                <p>Last month, I finally launched my collaborative map-based urban planning web application: <a href="https://plantogether.city">Plan Together</a>. It was a lot of work, but I must say I am proud of the result; it is my most feature-complete project to date. It’s quite an experience having to do 100% of the work for product development, system architecture design, programming, and user interface/experience design. It definitely increases one’s respect for the work of their co-workers in different departments. I highly recommend it.</p>
+<p>Here are some lessons I learned along the way from a software developer’s point of view:</p>
+<h2 id="1-consider-http-request-overhead">1. Consider HTTP request Overhead</h2>
+<p>As a C++ Back-End Web Service Developer I work mainly with a in-house binary transmission protocol which composes and parses the bare minimum of bytes per message. Sending data which is not directly relevant is considered an affront. During the initial design and prototype phase, my driving philosophy was to send many small requests, retrieving only what was immediately necessary. However, during trials, I had to confront the fact that each individual HTTP request is padded with a rather large amount of overhead due to Headers. I was forced to reduce the number of requests and increase their size, which is the logical approach from a web developer’s point of view. Lesson learned.</p>
+<h2 id="2-remember-database-access-overhead">2. Remember Database Access Overhead</h2>
+<p>Theoretically, this is an obvious one. But nothing hits you as hard as actually having to design data shape and retrieval processes yourself. Just as with HTTP requests, my initial approach had numerous small SELECTs, in an effort preventing retrieval of data that might not be needed. Originally, one SELECT would retrieve a collection of ids (defining relevant records), and other SELECTs would retrieve other data columns as needed. I was being too clever. Maybe my approach would work if database access was free, but that is far from the case. It became very clear; it is better to perform wider queries, selecting more information than needed. Go in, grab a chunk of mostly relevant data, and exit. Finally, cache it. Disturbing the database should be your last resort.</p>
+<h2 id="3-good-deployment-pipelines-are-hard-to-implement-but-worth-it">3. Good deployment pipelines are hard to implement (But Worth It)</h2>
+<p>As a developer at a large company, automated build setup, production deployment and configuration are parts of the software world that I don’t need to touch. I just focus on my teams specific modules, write code that fulfills requirements, and follow existing guidelines. After code is reviewed and tested, it is out of my hands. I do not directly take the code and make it do live work for users. Since I was the only person working on <a href="https://plantogether.city">Plan Together</a>, I obviously had to do it myself. Sometimes, configuration is pure hell. Figuring out the details of how GitHub Actions are triggered, which cloud platforms are best for your Front-End and Back-End, and how to best deploy your application takes a while and feels very unproductive. It was hard to let go of the mindset that if I was not working on the code or the concept, I was wasting time. Now, I am happy I spent that time. I can easily deploy changes just by merging feature-branches into the production branch and all deployment is automatic.</p>
+<h2 id="4-most-external-apis-are-easy-to-integrate">4. Most External APIs are easy to integrate</h2>
+<p>We are really living in a Golden Age of integration. Adding external features to your product is easier than ever. Finally writing something myself proved this directly. The <a href="https://plantogether.city">Plan Together</a> application automatically posts certain Map Items to twitter, mentioning relevant accounts: <a href="https://twitter.com/cityofcalgary/status/1228341986924679168">City Of Calgary Tweet Example</a>. I was surprised how easy this was to implement. I applied for a Twitter Developer Account, integrated the relevant library into the code-base and was easily able to start tweeting map images.</p>
+<h2 id="5-ruthlessly-prioritize-features-and-focus-on-releasing-anything">5. Ruthlessly Prioritize Features and Focus on Releasing Anything</h2>
+<p>It becomes very easy to delay a release. Feature and scope creep are real. And especially since you are the only person working on this project, your ego becomes tied up in it. You want it to be good enough, you start daydreaming of a big launch. So you keep adding more and more to the product. I caught myself doing this more than once during development. Now, after the initial release, I realized how important it is to get something out there into the real world. Not only do you get real feedback, but your self-pressure is taken off your shoulders. I have actually been able to accelerate development since release and added a handful new features: <a href="https://blog.plantogether.city/post/march-platform-updates/">9 New Features Added to Plan Together Since Launch</a></p>
+<p>Thanks for reading my article! Feel free to checkout <a href="https://plantogether.city">Plan Together</a>, or email me with comments/questions at <a href="mailto:dg@davidgorski.ca">dg@davidgorski.ca</a>.</p>
+
+            ]]>
+        </content>
+    </entry>
+    <entry>
+        <title>Back-End Development Basics</title>
+        <author>
+            <name>David Gorski</name>
+        </author>
+        <link href="https://tech.davidgorski.ca/back-end-development-basics.html"/>
+        <id>https://tech.davidgorski.ca/back-end-development-basics.html</id>
+            <category term="data"/>
+            <category term="backend"/>
+            <category term="Architecture"/>
+
+        <updated>2023-07-29T14:25:31-04:00</updated>
+            <summary></summary>
+        <content type="html">
+            <![CDATA[
+                <h2 id="know-your-data">Know your Data</h2>
+<p>It is most important for a back-end developer to understand the characteristics of the Data their software will interact with. This includes both data inflows and data outflows. Questions such as the following need to be asked:</p>
+<ul>
+<li>How much data is incoming?</li>
+<li>What is the shape/type of the data?</li>
+<li>How should this data be processed?</li>
+<li>Where is this data needed or useful?</li>
+<li>What is the corresponding response to this type of data?</li>
+<li>How soon is a response needed?</li>
+</ul>
+<p>After careful deliberation and analysis, implementation details will naturally emerge regarding load balancing, API design, data structures, micro-service division of labor, parallelization of processing, replication, stream-publishing, table design, caching, relational vs key-value etc. </p>
+<p>The data is the canonical source for developing robust back-end endpoints and services. This is relevant from the high-level architectural decisions all the way to direct coding.</p>
+<p>For example, a service which handles low data volume, with simply query parameters, with low amounts of processing (CRUD), with no real-time requirements in response time, can and should be incredibly simple. There is no reason to over-complicate things. A basic load-balancer paired with a simple web-app and simple db is good enough (with regular backups of course).</p>
+<p>Conversely, a service which handles billions of requests a day, with high levels of processing, and many orthogonal services waiting for the data will need specialized streams/queues, parallel processing, advanced backup systems, specialized data structures with aggressive caching.</p>
+<h2 id="architecture">Architecture</h2>
+<h3 id="system-scaling">System scaling</h3>
+<p>For high-performance, high-throughput systems, it is important to get the basics right. Paying attention to the data you are dealing with, and analyzing the space and time complexities of your algorithms is crucial.</p>
+<ul>
+<li>Use appropriate algorithms and data structures</li>
+<li>Lift load on resources as soon as possible. (Early returns, forwarding requests to relevant module, etc)</li>
+<li>Check for and handle errors as early as possible. Prevent propagation of errors.</li>
+<li>Find a good point of modularity (monolith vs microservices)</li>
+<li>As simple as possible data distribution and replication pipeline.</li>
+<li>Determine level of Data normalization (optimize for speed vs optimize for reduction of redundancy)</li>
+</ul>
+<h3 id="maintainability">Maintainability</h3>
+<p>For large systems, it is important to build services for maintainability. This includes using:</p>
+<ul>
+<li>Clean, clear code</li>
+<li>Simple abstractions</li>
+<li>Microservices for separation of concern</li>
+<li>Well-defined, versioned APIS, as well as organization process for creating new endpoints</li>
+<li>Re-use what you can</li>
+<li>Cherry-pick suitable design patterns (SOLID, functional, etc…), do not force</li>
+</ul>
+
+            ]]>
+        </content>
+    </entry>
+    <entry>
+        <title>The Fixed-Point Combinator Function</title>
+        <author>
+            <name>David Gorski</name>
+        </author>
+        <link href="https://tech.davidgorski.ca/the-fixed-point-combinator-function.html"/>
+        <id>https://tech.davidgorski.ca/the-fixed-point-combinator-function.html</id>
+            <category term="Scheme"/>
+            <category term="Functional Programming"/>
+
+        <updated>2023-07-29T14:27:41-04:00</updated>
+            <summary></summary>
+        <content type="html">
+            <![CDATA[
+                <p>The goal of this article is to explain the purpose and functionality of <strong>fixed-point combinator functions</strong>. I had a hard time following along with other articles on this topic so I wrote this as a learning exercise. We’ll be using the <strong>Scheme</strong> language.</p>
+<p>So what is a <strong>fixed-point combinator</strong>? It is a function which given a function as an argument, returns a fixed point of that function. Let’s demonstrate why this could be useful.</p>
+<p>First, let start by defining a factorial function recursively:</p>
+<pre><code>(define fact 
+  (lambda (n)
+    (if (zero? n) 1 (* n (fact (- n 1))))))
+</code></pre>
+<p>Theoretically, if our language suddenly loses recursion as a feature we run into a big problem; we can’t refer to a function that is not bound! There is no ‘self’ keyword inside a anonymous function (which would let us reference the function from within) and therefore the function will no longer be valid:</p>
+<pre><code>(lambda (n)
+  (if (zero? n) 1 (* n (??? (- n 1)))))
+</code></pre>
+<p>To clarify, the function is actually valid, but only for an input of <strong>0</strong>:</p>
+<pre><code>; 0 -&gt; 1
+
+((lambda (n)
+  (if (zero? n) 1 (* n (??? (- n 1))))) 0)
+</code></pre>
+<p>But if we try with any other value, it will fail:</p>
+<pre><code>; 1 -&gt; error: unbound symbol (???)
+
+((lambda (n)
+  (if (zero? n) 1 (* n (??? (- n 1))))) 1)
+</code></pre>
+<p>An input of <strong>1</strong> does not fulfill the first condition <strong>(zero?)</strong>, so it attempts to call <strong>???</strong> with <strong>(- n 1)</strong> as it’s argument. <strong>???</strong> is a symbol not bound to anything so an error is raised. However, we do know that for the current call the expression <strong>(- n 1)</strong> is equal to <strong>0</strong>, since <strong>n</strong> is bound to <strong>1</strong>. We know this function works for zero, so we know we can simply substitute it in for <strong>???</strong>. Now we have a function that works for two inputs: 0 and 1:</p>
+<pre><code>((lambda (n)
+  (if (zero? n)
+      1
+      (* n ((lambda (n)
+              (if (zero? n) 1 (* n (??? (- n 1))))) (- n 1))))) 1)
+</code></pre>
+<p>Using the former logic we can continue this process, replacing <strong>???</strong> with our ‘factorial’ lambda; creating a function that can work with another successive input. This could get tedious, so let’s write a function that does that for us.
+It will consume a function (f) and return the factorial function, replacing <strong>???</strong> with the input (f). If we provide this new function a factorial function it will have a factorial function to run if the term is not <strong>0</strong>.</p>
+<pre><code>(define fact-gen
+  (lambda (f)
+    (lambda (n)
+      (if (zero? n) 1 (* n (f (- n 1)))))))
+</code></pre>
+<p>By itself, the return value is our <strong>fact0</strong> function, which we used unbound earlier, Since an input of 0 doesnt call the <strong>f</strong> function, we can pass anything we’d like.</p>
+<pre><code>(define fact0 (fact-gen &#39;trash))
+ -&gt; (lambda (next)
+      (lambda (n)
+        (if (zero? n) 1 (* n (&#39;trash (- n 1))))))
+
+(fact0 0) -&gt; 1
+</code></pre>
+<p>However, due to the conditional statement, if input is greater than <strong>0</strong>, the argument will be called, and that’s simply impossible as it is currently is just  a <strong>‘trash</strong> symbol.</p>
+<pre><code>(fact0 1) -&gt; ERROR
+</code></pre>
+<p>We need to supply a function that will give us the factorial of <strong>(- 1 1)</strong>. Wait a second… That expression equals <strong>0</strong>… We already have a function that gives us the factorial of <strong>0</strong>… Let’s run <strong>fact-gen</strong> and pass it <strong>fact0</strong>.</p>
+<pre><code>(define fact&lt;=1 (fact-gen fact0))
+</code></pre>
+<p>Using this newly generated function, we can find the factorial of any number equal or less than one. Can we continue? In fact, yes!</p>
+<pre><code>(define fact&lt;=2 (fact-gen fact&lt;=1))
+</code></pre>
+<p>Now the next step is clear. We need to supply the consecutive factorial function to the previous factorial function n + 1 times (starting at 0). How can we continually feed the <strong>fact-gen</strong> function these next factorial functions? Turns out that a combinator function can do that for us:</p>
+<pre><code>(define combinator
+  (lambda (func)
+
+    (define make-step
+      (lambda (next-step)
+        (lambda (arg)
+          ((func (next-step next-step)) arg))))
+
+    (lambda (arg)
+      ((func (make-step make-step)) arg))))
+</code></pre>
+<p>Notice that the returned lambda at the end of <strong>combinator</strong> function and the returned lambda for the locally scoped function <strong>make-step</strong>, are exactly the same. This is crucial. That means that when the generated factorial function needs the next factorial function, it simply inserts itself again. Let’s walk through this. Running <strong>(combinator fact-gen)</strong> will return:</p>
+<pre><code>; figure-1
+(lambda (arg)
+  ((fact-gen (make-step make-step)) arg))
+</code></pre>
+<p>When this function is called with any argument it will first resolve the expression <strong>(make-step make-step)</strong>. This function call will return the following:</p>
+<pre><code>; figure-2
+(lambda (arg)
+  ((fact-gen (make-step make-step)) arg))
+</code></pre>
+<p>Does this look familiar? Its the same as before! This is the fixed point. As seen in <strong>figure-1</strong>, this lambda (figure-2) will serve as the argument for the <strong>(fact-gen figure-2)</strong> function call, which returns:</p>
+<pre><code>; figure-3
+(lambda (n)
+      (if (zero? n) 1 (* n (figure-2 (- n 1)))))
+</code></pre>
+<p>Let’s call it with the argument of number ‘1’: <strong>(figure-3 1)</strong>. Since 1 is not <strong>zero?</strong> the control flow will evaluate the next expression: <em><em>(</em> 1 (figure-2 (- 1 1)))</em>*. Which includes the function call <strong>(figure-2 (- 1 1))</strong>. This will return the following:</p>
+<pre><code>((fact-gen (make-step make-step)) arg)
+</code></pre>
+<p><strong>(make-step make-step)</strong> will again return:</p>
+<pre><code>; figure-4
+(lambda (arg)
+  ((fact-gen (make-step make-step)) arg))
+</code></pre>
+<p>and the whole <strong>figure-2</strong> call will evaluate to:</p>
+<pre><code>; figure-5
+(lambda (n)
+      (if (zero? n) 1 (* n (figure-4 (- n 1)))))
+</code></pre>
+<p>Just to clarify, we are currently evaluating <em><em>(</em> 1 (figure-2 (- 1 1)))</em>*. <strong>n</strong> is bound to <strong>0</strong> in <strong>figure-5</strong>, so the <strong>if</strong> expression returns 1. Therefore everything resolves to:</p>
+<pre><code>(* 1 1) -&gt; 1
+</code></pre>
+<p>And that’s pretty much it. We can simplify the whole thing by eliminating our locale definition of <strong>make-step</strong> and replacing our readable variables with single letters:</p>
+<pre><code>(define Z
+  (lambda (f)
+      (lambda (a)
+        ((f ((lambda (y) (lambda (a) ((f (y y)) a)))
+             (lambda (y) (lambda (a) ((f (y y)) a))))) a))))
+</code></pre>
+
+            ]]>
+        </content>
+    </entry>
+    <entry>
+        <title>Custom STL Compatible Iterators</title>
+        <author>
+            <name>David Gorski</name>
+        </author>
+        <link href="https://tech.davidgorski.ca/custom-stl-compatible-iterators.html"/>
+        <id>https://tech.davidgorski.ca/custom-stl-compatible-iterators.html</id>
+            <category term="Iterators"/>
+            <category term="C++"/>
+            <category term="Abtractions"/>
+
+        <updated>2023-07-29T14:32:44-04:00</updated>
+            <summary></summary>
+        <content type="html">
+            <![CDATA[
+                <h2 id="what-is-an-iterator">What is an Iterator?</h2>
+<p>The <strong>Iterator</strong> is the abstraction at the heart of all Collection-related functionality within the C++ Standard Library. Most algorithms are defined in terms of iterators. What is an iterator exactly?</p>
+<p>Fundamentally, an Iterator represents a point of iteration. A point of iteration describes:</p>
+<ul>
+<li>How to retrieve the value at the point</li>
+<li>How the point of iteration can be incremented/decremented</li>
+<li>How to compare it with other points of iteration</li>
+</ul>
+<p>For example: Conceptually, if you are ‘iterating’ over a <strong>book’s pages</strong>, the point of iteration could describe the following rules:</p>
+<ul>
+<li>The value at the point of iteration can be retrieved by reading the current page.</li>
+<li>The point of iteration can be incremented by turning the page forward.</li>
+<li>You can compare the point of iteration with other points of iteration by looking at the page number.</li>
+</ul>
+<p><em>Take note how this book example does not describe how to ‘decrement’ the iteration. Philosophically speaking, using this description; you could only ever turn the pages forward, never back.</em></p>
+<p>In C++, iterators are defined as objects with methods describing their rules.</p>
+<h2 id="creating-a-custom-collection">Creating a Custom Collection</h2>
+<p>First, we are going to create a custom collection type compatible with <strong>STL algorithm constructs</strong> and <strong>ranged for-loops</strong>. At that level of abstraction all we need to provide is <strong>begin()</strong> and <strong>end()</strong> methods, and then we will be able to write code like this:</p>
+<pre><code class="language-c++">Collection col;
+
+for(auto&amp; c : col)
+    cout &lt;&lt; c &lt;&lt; endl;
+
+std::transform(begin(col), end(col), begin(col), [](auto&amp; i)
+{
+    return i * i;
+});
+</code></pre>
+<p>Our collection will be a simple wrapper class around a c-array. This is what <strong>std::array</strong> provides in the Standard Library. In reality, you will only write custom collections and iterators if you need very particular data structures satisfying very specific requirements. Here is our collection definition:</p>
+<pre><code class="language-c++">template&lt;class T, int N&gt;
+class Collection
+{
+    T data[N] = { 0 };
+public:
+    col_iterator&lt;T&gt; begin()
+    {
+        return col_iterator&lt;T&gt;(data);
+    }
+    col_iterator&lt;T&gt; end()
+    {
+        return col_iterator&lt;T&gt;(data + N);
+    }
+};
+</code></pre>
+<p>We take type and size as template arguments, create an array of that type and size. We also define methods which return the iterators to the beginning and end of the collection, passing the pointers to the first element (data) and just past the last element (data + N) as arguments.</p>
+<h2 id="the-iterator-itself">The Iterator Itself</h2>
+<p>Now that we have created a collection-type, we need to define the iterator for use with the <strong>begin()</strong> and <strong>end()</strong> methods. First, we declare our iterator class ahead of our collection class declaration (The class needs to be aware of the iterator’s existence), and then we define the iterator below the collection definition:</p>
+<pre><code class="language-c++">template &lt;class T&gt; class col_iterator; // Declaration
+
+// Collection class definition  here ...
+
+template &lt;class T&gt;
+class col_iterator // Definition
+{
+    // Iterator Definition Goes Here
+}
+</code></pre>
+<p>There a few things an iterator needs in order to be STL compatible. This also depends on the type of the iterator. The types of iterators are:</p>
+<ul>
+<li>Input Iterators</li>
+<li>Output Iterators</li>
+<li>Forward Iterator</li>
+<li>Bidirectional Iterators</li>
+<li>Random-Access Iterators</li>
+</ul>
+<p>Each of these have different requirements. For the sake of simplicity, we will be defining a <strong>Forward Iterator</strong> for our collection, which has less requirements. These are the requirements for <strong>Forward Iterators</strong>:</p>
+<ol>
+<li><strong>Iterator Characteristics</strong> - Five member type definitions which describe the iterator type and datatypes that iterator is related to.</li>
+<li><strong>Default Constructor</strong> -  Ability to construct the iterator with no arguments</li>
+<li>**Dereference Operator *** - to access the underlying data the iterator is “pointing” towards.</li>
+<li><strong>Not-Equal Operator !=</strong> - to know when iterators are not equal to one another</li>
+<li><strong>Pre-Increment Operator ++</strong> - to increment the iterator.</li>
+<li><strong>Post-Increment Operator ++</strong> - to create and return an incremented iterator.</li>
+</ol>
+<p>And that’s it! If these elements are present in a class it is a valid iterator that can be used with STL algorithms. These members must be publically accessible.</p>
+<p>Let’s define our iterator in code:</p>
+<pre><code class="language-c++">#include &lt;iterator&gt;
+
+template &lt;class T&gt;
+class col_iterator
+{
+    T* data;
+public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = T;
+    using difference_type = size_t;
+    using pointer = T*;
+    using reference = T&amp;;
+
+    col_iterator(){}
+    col_iterator(pointer _data) : data(_data) {}
+
+    pointer data() { return data; }
+    reference operator*() { return *data; }
+    bool operator!=(const col_iterator&amp; other)
+    {
+        return data != other.data();
+    }
+    col_iterator&lt;T&gt;&amp; operator++()
+    {
+        data += 1;
+        return *this;
+    }
+    col_iterator&lt;T&gt; operator++(int)
+    {
+        return col_iterator&lt;T&gt;(data + 1);
+    }
+};
+</code></pre>
+<p>As you can see we have defined all the required elements of a <strong>Forward Iterator</strong>. One thing to note is the member <strong>iterator_category</strong>. It uses the <strong>std::forward_iterator_tag</strong> from the standard library marking this iterator as a <strong>Forward Iterator</strong>. These tags are available in <strong><iterator></strong>.</p>
+<p>Now our class should easily work with STL algorithms such as the following:</p>
+<pre><code class="language-c++">Collection&lt;int, 5&gt; test;
+std::fill(test.begin(), test.end(), 10);
+</code></pre>
+<p>To get more familiar with iterators:</p>
+<ul>
+<li>Add constant iterators to your collection ( define <strong>cend()</strong> and <strong>cbegin()</strong>).</li>
+<li>Read up on the different iterator types and their specific requirements.</li>
+<li>Implement different iterator types for your collection.</li>
+<li>Try creating a collection with a different underlying type. For example using a linked-list instead of c-array. The increment and decrement methods will be much different.</li>
+</ul>
+<h2 id="complete-code-example">Complete Code Example</h2>
+<pre><code class="language-c++">#include &lt;iterator&gt;
+#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+
+template &lt;class T&gt; class col_iterator;
+
+template&lt;class T, int N&gt;
+class Collection
+{
+    T data[N] = { 0 };
+public:
+    col_iterator&lt;T&gt; begin()
+    {
+        return col_iterator&lt;T&gt;(data);
+    }
+    col_iterator&lt;T&gt; end()
+    {
+        return col_iterator&lt;T&gt;(data + N);
+    }
+};
+
+template &lt;class T&gt;
+class col_iterator
+{
+public:
+    T* data;
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = T;
+    using difference_type = size_t;
+    using pointer = T*;
+    using reference = T&amp;;
+
+    col_iterator(){}
+    col_iterator(pointer _data) : data(_data) {}
+
+    reference operator*() { return *data; }
+    bool operator!=(const col_iterator&amp; other)
+    {
+        return data != other.data;
+    }
+    col_iterator&lt;T&gt;&amp; operator++()
+    {
+        data += 1;
+        return *this;
+    }
+    col_iterator&lt;T&gt; operator++(int)
+    {
+        return col_iterator&lt;T&gt;(data + 1);
+    }
+};
+
+int main(void)
+{
+    Collection&lt;int,10&gt; test;
+
+    std::fill(test.begin(), test.end(), 2);
+
+    std::transform(test.begin(), test.end(), test.begin(), [](int i)
+    {
+        return i * i;
+    });
+
+    for(auto t : test)
+        std::cout &lt;&lt; t &lt;&lt; std::endl;
+}   
+</code></pre>
+
+            ]]>
+        </content>
+    </entry>
+    <entry>
+        <title>Cookie-based Session Management</title>
+        <author>
+            <name>David Gorski</name>
+        </author>
+        <link href="https://tech.davidgorski.ca/cookie-based-session-management.html"/>
+        <id>https://tech.davidgorski.ca/cookie-based-session-management.html</id>
+            <category term="sessions"/>
+            <category term="python"/>
+
+        <updated>2023-07-29T14:31:37-04:00</updated>
+            <summary></summary>
+        <content type="html">
+            <![CDATA[
+                <p>Web frameworks had held my hand. Which for a beginner was great, but a lot of the fundamental aspects of back-end development had been abstracted from me, and I found annoying discrepancies between my knowledge and know-how. Sessions were one element I had neglected. I had taken them for granted; somehow magically some level of state is maintained between the server and the client.</p>
+<p>It wasn’t till I started writing my <a href="https://github.com/dgski/baseketbase-agg">News Aggregator</a> Project in <a href="https://racket-lang.org">Racket</a> that I realized I don’t really know how sessions work. Racket’s a great language, but it’s not exactly popular and doesn’t have any web frameworks. I needed to learn and write my own session manager. So I did.</p>
+<p>How exactly does the server know whether a given client is logged in? Turns out it’s mainly about <strong>cookies</strong>. Cookies are small collections of data that the server asks the client to store. They are transmitted in the HTTP request headers under the <strong>Cookie</strong> section, and held by the browser on the client’s end. </p>
+<p>For sessions, the server generates a session id, tells the client to remember it, the client does so and attaches that sid to following requests, so the server knows whether a request belongs to an authenticated session or not.</p>
+<p>To better understand how this works; let’s write a simple HTTP request handler. We will use the basic web server provided in python’s <strong>http.server</strong> package. </p>
+<p>We will start with three elements:</p>
+<ul>
+<li>address: this is the address and port at which the server will listen for connections</li>
+<li>handler: this is a class which has the necessary methods to handle requests</li>
+<li>server: we will initialize the built-in <strong>HTTPServer</strong> object with our address and handler.</li>
+</ul>
+<p>Finally, we will start our server using the <strong>serve_forever()</strong> method:</p>
+<pre><code class="language-python">from http.server import *
+
+#Setup
+address = (&#39;&#39;, 8000)
+handler = BaseHTTPRequestHandler
+server = HTTPServer(address, handler)
+
+#Start
+server.serve_forever()
+</code></pre>
+<p>We can send a request to our new server using a browser at <strong>localhost:8000</strong>. However, we should still the following error:</p>
+<pre><code class="language-text">Error response
+
+Error code: 501
+
+Message: Unsupported method (&#39;GET&#39;).
+
+Error code explanation: HTTPStatus.NOT_IMPLEMENTED -
+Server does not support this operation.
+</code></pre>
+<p>Looks like our handler can’t handle simple <strong>GET</strong> requests… We need to do something about that. Define a new class at the top of the file. We still use <strong>BaseHTTPRequestHandler</strong> as the parent class, but add the <strong>do_GET()</strong> method:</p>
+<pre><code class="language-python">
+class SessionHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.response = 200
+        self.send_header(&#39;Content-type&#39;,&#39;text/html&#39;)
+        content = &quot;Hello&quot;
+        self.wfile.write(bytes(content, &quot;utf-8&quot;))
+</code></pre>
+<p>Remember to change the handler to our new class:</p>
+<pre><code class="language-python">handler = SessionHandler
+</code></pre>
+<h2 id="dispatching">Dispatching</h2>
+<p>Now if you visit again with your browser, you should now see the raw text, “Hello” displayed. That’s a good start, but we need our server to do different things based on different URL paths. Let’s add a simple dispatcher and methods to handle the paths:</p>
+<pre><code class="language-python">class SessionHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        routes = {
+            &quot;/login&quot;:   self.login,
+            &quot;/logout&quot;:  self.logout,
+            &quot;/&quot;:        self.home
+        }
+        try:
+            response = 200
+            content = routes[self.path]()
+        except:
+            response = 404
+            content = &quot;Not Found&quot;
+            
+        self.send_response(response)
+        self.send_header(&#39;Content-type&#39;,&#39;text/html&#39;)
+        self.end_headers()
+        self.wfile.write(bytes(content, &quot;utf-8&quot;))
+        return
+    
+    def home(self):
+        return &quot;Welcome Home&quot;
+
+    def login(self):
+        # todo: perform login
+        return &quot;Logged In&quot;
+
+    def logout(self):
+        # todo: perform logout
+        return &quot;Logged Out&quot;
+</code></pre>
+<p>Okay, things are taking shape. Let’s run through what was added:</p>
+<ul>
+<li>The <strong>routes</strong> dictionary has paths as keys and page methods as values.</li>
+<li>We use the <strong>try,except</strong> statement to try to access the methods using the path. If it works, we set <strong>response</strong> to 200 (success) and prepare our content. Otherwise, we set <strong>response</strong> to 404 (not found) and set content to <strong>Not Found</strong>.</li>
+<li>The home, login and logout methods return a text string representing themselves.</li>
+</ul>
+<h2 id="logging-in">Logging In</h2>
+<p>Now let’s implement our login process. After a user logs in, the time spent logged in is referred to as a <strong>session</strong>. For each login and consecutive logout, we will have a unique session id (sid). So obviously, our next immediate step is to generate a new <strong>sid</strong> when the user clicks on login. We will use a dictionary to store our sessions ids. Usually a database fulfills this role, but for our simple purposes, this should be enough. For incredibly basic security import the randint function:</p>
+<pre><code class="language-python">from random import randint
+</code></pre>
+<p>Add the following method to generate the sid:</p>
+<pre><code class="language-python">def generate_sid(self):
+    return &quot;&quot;.join(str(randint(1,9)) for _ in range(100))
+</code></pre>
+<p>Add a global dictionary to the top of the file:</p>
+<pre><code class="language-python">sessions = {}
+</code></pre>
+<p>Make the following changes to the <strong>login</strong> method:</p>
+<pre><code class="language-python">def login(self):
+    # Password normally be checked here
+    sid = self.generate_sid()
+    self.cookie = &quot;sid={}&quot;.format(sid)
+    sessions[sid] = {&quot;username&quot;, &quot;useragent&quot;,&quot;ip address&quot;,&quot;expiry&quot;}
+    return &quot;Logged In&quot;
+</code></pre>
+<p>Add the following <strong>send_header</strong> function calls to bottom of the <strong>do_GET</strong> method:</p>
+<pre><code class="language-python">def do_GET(self): 
+    #...
+    self.cookie = None # Addition
+    self.send_response(response)
+    self.send_header(&#39;Content-type&#39;,&#39;text/html&#39;)
+    if self.cookie:
+            self.send_header(&#39;Set-Cookie&#39;, self.cookie) # Addition
+    self.end_headers()
+    self.wfile.write(bytes(content, &quot;utf-8&quot;))
+    return
+</code></pre>
+<p>What is happening should be clear: <strong>login()</strong> is setting the <strong>self.cookie</strong> member variable to a random string of numbers, and <strong>self.send_header(‘Set-Cookie’, self.cookie)</strong> is sending it off as a cookie value. Now if you visit <strong>/login</strong> in your browser, and open up the web inspector, you should see <strong>sid</strong> as a cookie, with the value as whatever you generated. This cookie is held by the browser, and will be forwarded to our server with every request. It provides ‘context’ between requests.</p>
+<p>Also, notice that <strong>login()</strong> adds the sid to the dictionary as a key with a dummy dictionary <strong>{“username”, “useragent”,”ip address”,”expiry”}</strong> as a value. This is where a complete session manager would store those pieces of information about the user, to later verify the session. Add this on your own.</p>
+<h2 id="validating-users">Validating users</h2>
+<p>Now we need to perform the most fundamental aspect of session management: validating a session. Let’s say there is some content that only registered, logged in users can see. We don’t want our user to have to provide their password with each page request; That would be incredibly cumbersome. We need to check if a request contains a session and display the right thing. We need to extract a header’s sid to get that information. Add the following method to our <strong>SessionHandler</strong> class:</p>
+<pre><code class="language-python">def parse_cookies(self, cookie_list):
+    return dict(((c.split(&quot;=&quot;)) for c in cookie_list.split(&quot;;&quot;))) if cookie_list else {}
+</code></pre>
+<p>This will nicely extract the cookies string from the request and put it into a dictionary for our convenience. Also alter our <strong>do_GET</strong> <strong>try</strong> block so it looks like this:</p>
+<pre><code class="language-python">try:
+    response = 200
+    cookies = self.parse_cookies(self.headers[&quot;Cookie&quot;])
+    if &quot;sid&quot; in cookies:
+        self.user = cookies[&quot;sid&quot;] if (cookies[&quot;sid&quot;] in sessions) else False
+    else:
+        self.user = False
+    content = routes[self.path]()
+</code></pre>
+<p>Our home page should display whether a user is currently logged in:</p>
+<pre><code class="language-python">def home(self):
+        return &quot;Welcome User!&quot; if self.user else &quot;Welcome Stranger!&quot;
+</code></pre>
+<p>What is happening here? Take a closer look at the try block. There are a few interesting things happening within:</p>
+<ul>
+<li>As before, we are setting the response to code 200, which for a HTTP request, it means that the page was found</li>
+<li>Secondly, we are parsing the <strong>Cookie</strong> section of the header. Our <strong>parse_cookies</strong> method splits the Cookie string by “;” to seperate the individual cookies, then it puts the cookie ids and their values into a dictionary. If there are no cookies, it responds with an empty dictionary</li>
+<li>Next, our try block checks if “sid” is in the <strong>cookies</strong> dictionary. If it isn’t, it sets <strong>self.user</strong> to false. Otherwise, it then checks whether the sid value stored in the <strong>sessions</strong> global.</li>
+<li>From then on, it’s business as usual.</li>
+</ul>
+<p>We have altered a fundamental behaviour of our micro-program: when we visit the homepage without a generated sid cookie being broadcast by the browser we will see:</p>
+<pre><code class="language-text">&quot;Welcome Stranger!&quot;
+</code></pre>
+<p>Clearly, unless the sid is stored in the <strong>sessions</strong> dictionary, the application instance does not recognize the web user. But if the user logs in using the rudimentary <strong>/login</strong> page, it will display:</p>
+<pre><code class="language-text">&quot;Welcome User!&quot;
+</code></pre>
+<p>Try logging in, and then restarting our server. If you return to the home page, it won’t recognize you, even if the browser holds and sends a <strong>sid</strong> cookie. Because the dictionary dies with the process, our server completely forgets about the session. If you visit the <strong>login</strong> page again, a new <strong>sid</strong> is generated, and we get <strong>“Welcome User!”</strong>.</p>
+<p>To Recap: the login process generates a new sid, saves the users information(user agent, ip address, etc), and sends back a header asking for the user’s browser to remember the new sid. Of course to be useful in most cases,  you would have to validate a login password before generating the sid and continuing, but the fundamental aspects of session management are already present.</p>
+<h2 id="logging-out">Logging Out</h2>
+<p>What if the user wants to end their session? Well, we should probably give them a log out page as well. Let’s add something to our currently useless logout page:</p>
+<pre><code class="language-python">    def logout(self):
+        if not self.user:
+            return &quot;Can&#39;t Log Out: No User Logged In&quot;
+        self.cookie = &quot;sid=&quot;
+        del sessions[self.user]
+        return &quot;Logged Out&quot;
+</code></pre>
+<p>This method will check if a valid user is logged in, set the cookie to empty and delete the session id from the <strong>sessions</strong> dictionary, before returning the <strong>“Logged Out”</strong> text.</p>
+<p>Check out what happens now: restart our your server application, open it and validate the following happens in order:</p>
+<ol>
+<li>On First Visit of the home page <strong>“/“</strong> it should display: “Welcome Stranger!”.</li>
+<li>If you now visit <strong>“/login”</strong>, it should display “Logged In”, check your cookies for the “/“ domain, you should see an <strong>sid</strong> cookie with the newly generated session.</li>
+<li>Now if you visit the home page, your should see: “Welcome User!”. Congratulations, your session has been validated!</li>
+<li>Next test if the <strong>“/logout”</strong> page works. Visit it, it should say “Logged Out”. Make sure it worked by once again checking your cookies in your browser. The <strong>sid</strong> cookie should be empty.</li>
+<li>If you visit the home page again, it should display: “Welcome Stranger!”. You have successfully logged out.</li>
+</ol>
+<p>The complete code should now look like:</p>
+<pre><code class="language-python">from http.server import *
+from random import randint
+
+sessions = {}
+
+class SessionHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        routes = {
+            &quot;/login&quot;: self.login,
+            &quot;/logout&quot;: self.logout,
+            &quot;/&quot;: self.home
+        }
+        self.cookie = None
+        try:
+            response = 200
+            cookies = self.parse_cookies(self.headers[&quot;Cookie&quot;])
+            if &quot;sid&quot; in cookies:
+                self.user = cookies[&quot;sid&quot;] if (cookies[&quot;sid&quot;] in sessions) else False
+            else:
+                self.user = False
+            content = routes[self.path]()
+        except:
+            response = 404
+            content = &quot;Not Found&quot;
+        
+        self.send_response(response)
+        self.send_header(&#39;Content-type&#39;,&#39;text/html&#39;)
+
+        if self.cookie:
+            self.send_header(&#39;Set-Cookie&#39;, self.cookie)
+
+        self.end_headers()
+        self.wfile.write(bytes(content, &quot;utf-8&quot;))
+        return
+    
+    def home(self):
+        return &quot;Welcome User!&quot; if self.user else &quot;Welcome Stranger!&quot;
+
+    def login(self):
+        # Password would normally be checked here
+        sid = self.generate_sid()
+        self.cookie = &quot;sid={}&quot;.format(sid)
+        sessions[sid] = {&quot;username&quot;, &quot;useragent&quot;,&quot;ip address&quot;,&quot;expiry&quot;}
+        return &quot;Logged In&quot;
+
+    def logout(self):
+        if not self.user:
+            return &quot;Can&#39;t Log Out: No User Logged In&quot;
+        self.cookie = &quot;sid=&quot;
+        del sessions[self.user]
+        return &quot;Logged Out&quot;
+
+    def generate_sid(self):
+        return &quot;&quot;.join(str(randint(1,9)) for _ in range(100))
+
+    def parse_cookies(self, cookie_list):
+        return dict(((c.split(&quot;=&quot;)) for c in cookie_list.split(&quot;;&quot;))) \
+        if cookie_list else {}
+
+address = (&#39;&#39;, 8000)
+handler = SessionHandler
+server = HTTPServer(address, handler)
+
+server.serve_forever()
+</code></pre>
+<p>Please read more about cookies, their expiration setting, and elements of session security before deploying anything like this. There are many more standard practices to consider; including encrypting the session id. Stay Safe!</p>
+
             ]]>
         </content>
     </entry>
@@ -106,7 +1257,7 @@
         <id>https://tech.davidgorski.ca/collector-functions-in-scheme.html</id>
             <category term="Technology"/>
 
-        <updated>2023-05-20T16:18:36-04:00</updated>
+        <updated>2023-07-29T14:24:36-04:00</updated>
             <summary></summary>
         <content type="html">
             <![CDATA[

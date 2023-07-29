@@ -1,0 +1,78 @@
+<!DOCTYPE html><html lang="en-us" data-theme="light"><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Concise Result Extraction in Modern C++ - David Gorski&#x27;s Tech Blog</title><meta name="generator" content="Publii Open-Source CMS for Static Site"><link rel="canonical" href="https://tech.davidgorski.ca/concise-result-extraction-in-modern-c.html"><link rel="alternate" type="application/atom+xml" href="https://tech.davidgorski.ca/feed.xml"><link rel="alternate" type="application/json" href="https://tech.davidgorski.ca/feed.json"><meta property="og:title" content="Concise Result Extraction in Modern C++"><meta property="og:site_name" content="David Gorski's Tech Blog"><meta property="og:description" content=""><meta property="og:url" content="https://tech.davidgorski.ca/concise-result-extraction-in-modern-c.html"><meta property="og:type" content="article"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Merriweather&display=swap" rel="stylesheet"><link rel="stylesheet" href="https://unpkg.com/@picocss/pico@latest/css/pico.min.css"><link rel="stylesheet" href="https://tech.davidgorski.ca/assets/css/style.css?v=0a84ec904691ac8314428f82627e777a"><script type="application/ld+json">{"@context":"http://schema.org","@type":"Article","mainEntityOfPage":{"@type":"WebPage","@id":"https://tech.davidgorski.ca/concise-result-extraction-in-modern-c.html"},"headline":"Concise Result Extraction in Modern C++","datePublished":"2021-03-06T14:28","dateModified":"2023-07-29T14:28","description":"","author":{"@type":"Person","name":"David Gorski","url":"https://tech.davidgorski.ca/authors/david-gorski/"},"publisher":{"@type":"Organization","name":"David Gorski"}}</script></head><body><nav class="container-fluid"><ul><li><strong><a id="logo" href="https://tech.davidgorski.ca/">David Gorski&#x27;s Tech Blog</a></strong></li></ul><ul><li><a href="https://davidgorski.ca">About</a></li></ul></nav><main class="container"><div><header><hgroup><h1>Concise Result Extraction in Modern C++</h1><h3><time datetime="2021-03-06T14:28">Mar 6th 2021 </time>By <a href="https://davidgorski.ca" rel="author" title="David Gorski">David Gorski</a></h3></hgroup></header><div id="post-entry"><p>A popular idiom in <strong>functional programming</strong> is the use of <a href="https://en.wikipedia.org/wiki/Algebraic_data_type">sum types</a> to express results or optional values. When a function returns, it either succeeded and we get the result, or it failed and we have an error on our hands. This is a pattern in Modern C++ as well, enabled by standard library types such as <a href="https://en.cppreference.com/w/cpp/utility/variant">std::variant</a> and <a href="https://en.cppreference.com/w/cpp/utility/optional">std::optional</a>. In this article we will explore how to improve the ergonomics of handling multiple results and potential error values.</p><h2 id="the-result-type">The ‘Result’ Type</h2><p>For the purpose of this example we will define a simple ‘Result’ type: a variant that is either an ‘Error’ or a templated Type:</p><pre><code class="language-c++">struct Error {
+    std::string message;
+    Error(std::string _message) : message(std::move(_message)) {}
+};
+template&lt;typename Type&gt;
+using Result = std::variant&lt;Error, Type&gt;;
+</code></pre><p>Now we can define functions that either succeed and return a specified type, or an Error object which holds a message:</p><pre><code class="language-c++">Result&lt;int&gt; getCloudInteger(Cloud&amp; cloud) {
+    if(!cloud.ok()) {
+        return Error(cloud.get_error_message());
+    }
+
+    return cloud.get_int();
+}
+</code></pre><h2 id="getting-results">Getting Results</h2><p>This a pretty neat and clear interface, however, as with many operations we may be performing multiple operations that may success or fail. This results in a growing amount of boilerplate in the business logic code. Even when using a overloaded + operator for combining errors:</p><pre><code class="language-c++">auto res1 = getCloudInteger(cloud1);
+auto res2 = getCloudInteger(cloud2);
+auto res3 = getCloudInteger(cloud3);
+if(is_error(res1 &amp;&amp; is_error(res2) &amp;&amp; is_error(res3)) {
+    return get_error(res1) + get_error(res2) + get_error(res3);
+} else if(is_error(res1) &amp;&amp; is_error(res2)) {
+    return get_error(res1) + get_error(res2);
+} else if(is_error(res1) &amp;&amp; is_error(res3)) {
+    return get_error(res1) + get_error(res3);
+} else if(is_error(res1)) {
+    return get_error(res1);
+} else if(is_error(res2)) {
+    return get_error(res2);
+} else if(is_error(res3)) {
+    return get_error(res3);
+}
+auto val1 = get_ok(res1);
+auto val2 = get_ok(res2);
+auto val3 = get_ok(res3);
+</code></pre><p><em>Note: is_error, get_error and get_ok are simple utility functions wrapping std::get<int>and std::holds_alternative</int></em></p><p>As the number of results we are processing increases, more and more lines of code are to be added. Obviously, it is best to keep your business logic as clear and uncluttered from ‘implementation-level’ concerns are possible. So how can we do this better? Modern C++ gives us template parameter packs, which allows to type-safe, variable argument functions with derived return types. We will leverage them to iterate over all the results and consolidate any errors.</p><h2 id="using-parameter-packs">Using Parameter Packs</h2><p>Parameter packs are often iterated via recursion (especially before C++17). So to start we will define two overloaded functions:</p><ul><li>One that takes only a distinct result type.</li><li>One that takes a distinct result type and a pack argument.</li></ul><pre><code class="language-c++">template&lt;typename Type&gt;
+auto get_all(Result&lt;Type&gt;&amp; r) -&gt; ?;
+
+template&lt;typename Type, typename... Types&gt;
+auto get_all(Result&lt;Type&gt;&amp; r, Types&amp;... rest) -&gt; ?;
+</code></pre><p>Now, we must determine a suitable return value interface for this operation. We can use our Result type, as it already provides a value or error paradigm. What should be the success type within the Result? Since we want this function to be used generically we don’t want a class with named member types. And using a standard library container type (such as std::vector) would add unnecessary overhead. Using a <a href="https://en.cppreference.com/w/cpp/utility/tuple">std::tuple</a> with the same result order as the provided pack is the best option. This also provides compatibility with very convenient syntax sugar such as <a href="https://en.cppreference.com/w/cpp/utility/tuple/tie">std::tie</a> and <a href="https://en.cppreference.com/w/cpp/language/structured_binding">C++17 structure bindings</a>.</p><p>Let define our single argument <strong>get_all</strong> function first:</p><pre><code class="language-c++">template&lt;typename Type&gt;
+auto get_all(Result&lt;Type&gt;&amp; r) -&gt; Result&lt;std::tuple&lt;Type&gt;&gt; {
+    if(is_error(r)) {
+        return get_error(r);
+    }
+    return std::make_tuple(get_ok(r));
+}
+</code></pre><p>This is one is easy. The return type is simply a Result of <strong>std::tuple</strong> composed of one value: the results success type. If the result contains an error we simple return that error. Otherwise we get the value, stuff it in a tuple and stuff that tuple in a Result.</p><p>The variable argument version is a little more tricky. We will have to leverage some Modern C++ to implement it properly. First we need to determine the return type for the signature. Again, the overarching type is the Result type. What is the success type? A tuple of all the success types of all the provided Result arguments. We need to extract that by feeding some tuple utility function faux calls to the <a href="https://en.cppreference.com/w/cpp/language/decltype">decltype</a> specifier.</p><pre><code class="language-c++">template&lt;typename Type, typename... Types&gt;
+auto get_all(Result&lt;Type&gt;&amp; r, Types&amp;... rest)
+-&gt; Result&lt;decltype(std::tuple_cat(std::make_tuple(get_ok(r)), get_ok(get_all(rest...))))&gt;
+</code></pre><p>Whew! Quite a bit! Although, if you’re used to C++, you will actually find that signature to be pretty clear. The <strong>decltype</strong> specifier simply “returns” the type of the expression it is provided. In this case we are saying:</p><ul><li><strong>decltype</strong>: Get me the type of this expression</li><li><strong>std::tuple_cat</strong>: Concatenate these tuples.</li><li><strong>std::make_tuple</strong>: Make a tuple with these arguments. We provide one argument: the success result of the provided first argument.</li><li><strong>get_ok(get_all(res…))</strong>: Get the success result of getting the combined result of all arguments except the first one (the return type of this function call is Result of std::tuple&lt;…&gt;)</li></ul><p>Here is final body:</p><pre><code class="language-c++">template&lt;typename Type, typename... Types&gt;
+auto get_all(Result&lt;Type&gt;&amp; r, Types&amp;... rest)
+-&gt; Result&lt;decltype(std::tuple_cat(std::make_tuple(get_ok(r)), get_ok(get_all(rest...))))&gt; {
+    auto restRes = get_all(rest...);
+    if(is_error(r) &amp;&amp; is_error(restRes)) {
+        return get_error(r) + get_error(restRes);
+    } else if(is_error(r)) {
+        return get_error(r);
+    } else if(is_error(restRes)) {
+        return get_error(restRes);
+    }
+
+    return std::tuple_cat(std::make_tuple(get_ok(r)), get_ok(restRes));
+}
+</code></pre><p>The function body is a lot simpler once we know what we are returning. First we recursively call get_all on the argument except the first one. Then we check their error status. If both are errors, we combine the errors using an overloaded + operator, if only the current result is an error we return that error, otherwise we return the consolidated error from the consecutive arguments. If there are no errors at all, we concatenate a tuple comprised of the first result and the tuple returned from the recursive call on the remaining arguments. Viola!</p><h2 id="finale">Finale</h2><p>Now we can ergonomically and concisely extract results and check for errors:</p><pre><code class="language-c++">auto res1 = getCloudInteger(cloud1);
+auto res2 = getCloudInteger(cloud2);
+auto res3 = getCloudInteger(cloud3);
+auto aggregate_res = get_all(res1, res2, res3);
+if(is_error(aggregate_res)) {
+    return get_error(aggregate_res);
+}
+auto [val1, val2, val3] = get_ok(aggregate_res);
+</code></pre><p>This can be further refined and modified to suit your needs. Perhaps you can use an R-Value Reference argument signature and eliminate the need for the temporary Result variables:</p><pre><code class="language-c++">auto aggregate_res = get_all(
+    getCloudInteger(cloud1), getCloudInteger(cloud2), getCloudInteger(cloud3));
+if(is_error(aggregate_res)) {
+    return get_error(aggregate_res);
+}
+auto [val1, val2, val3] = get_ok(aggregate_res);
+</code></pre><p>Or, if you prefer exception-based error handling but are dealing with a functional interface, you can simply throw exceptions within a get_all wrapper, eliminating even more boilerplate:</p><pre><code class="language-c++">auto [val1, val2, val3] = get_all_vals(
+    getCloudInteger(cloud1), getCloudInteger(cloud2), getCloudInteger(cloud3)
+</code></pre><p>Modern C++ Parameter Packs and error handling allow for cleaner call sites around your business logic. Writing a simple helper function like this is not difficult and can reduce the number of lines of code while allowing you to express your ideas and control flow more cleanly. This is especially useful for <strong>std::async and std::future</strong> and other libraries like it.</p><p><a href="https://gist.github.com/dgski/df5d7dcfc77031f79675f3b50565a051">Link to Complete Code Example</a></p></div><div id="author-bio"></div><nav id="post-navigation"><a href="https://tech.davidgorski.ca/five-web-project-lessons.html" rel="prev">&larr; Previous (Five Web Project Lessons) </a><a href="https://tech.davidgorski.ca/a-simple-personal-data-backup-setup-2.html" rel="next">Next (A Simple Personal Data Backup Setup) &rarr;</a></nav></div></main><footer></footer><script async src="https://tech.davidgorski.ca/assets/js/scripts.js?v=3733efd39cd6c799b95c8fcb96993840"></script></body></html>

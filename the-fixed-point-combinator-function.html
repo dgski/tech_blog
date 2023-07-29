@@ -1,0 +1,64 @@
+<!DOCTYPE html><html lang="en-us" data-theme="light"><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><title>The Fixed-Point Combinator Function - David Gorski&#x27;s Tech Blog</title><meta name="generator" content="Publii Open-Source CMS for Static Site"><link rel="canonical" href="https://tech.davidgorski.ca/the-fixed-point-combinator-function.html"><link rel="alternate" type="application/atom+xml" href="https://tech.davidgorski.ca/feed.xml"><link rel="alternate" type="application/json" href="https://tech.davidgorski.ca/feed.json"><meta property="og:title" content="The Fixed-Point Combinator Function"><meta property="og:site_name" content="David Gorski's Tech Blog"><meta property="og:description" content=""><meta property="og:url" content="https://tech.davidgorski.ca/the-fixed-point-combinator-function.html"><meta property="og:type" content="article"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Merriweather&display=swap" rel="stylesheet"><link rel="stylesheet" href="https://unpkg.com/@picocss/pico@latest/css/pico.min.css"><link rel="stylesheet" href="https://tech.davidgorski.ca/assets/css/style.css?v=0a84ec904691ac8314428f82627e777a"><script type="application/ld+json">{"@context":"http://schema.org","@type":"Article","mainEntityOfPage":{"@type":"WebPage","@id":"https://tech.davidgorski.ca/the-fixed-point-combinator-function.html"},"headline":"The Fixed-Point Combinator Function","datePublished":"2019-05-12T14:27","dateModified":"2023-07-29T14:27","description":"","author":{"@type":"Person","name":"David Gorski","url":"https://tech.davidgorski.ca/authors/david-gorski/"},"publisher":{"@type":"Organization","name":"David Gorski"}}</script></head><body><nav class="container-fluid"><ul><li><strong><a id="logo" href="https://tech.davidgorski.ca/">David Gorski&#x27;s Tech Blog</a></strong></li></ul><ul><li><a href="https://davidgorski.ca">About</a></li></ul></nav><main class="container"><div><header><hgroup><h1>The Fixed-Point Combinator Function</h1><h3><time datetime="2019-05-12T14:27">May 12th 2019 </time>By <a href="https://davidgorski.ca" rel="author" title="David Gorski">David Gorski</a></h3></hgroup></header><div id="post-entry"><p>The goal of this article is to explain the purpose and functionality of <strong>fixed-point combinator functions</strong>. I had a hard time following along with other articles on this topic so I wrote this as a learning exercise. We’ll be using the <strong>Scheme</strong> language.</p><p>So what is a <strong>fixed-point combinator</strong>? It is a function which given a function as an argument, returns a fixed point of that function. Let’s demonstrate why this could be useful.</p><p>First, let start by defining a factorial function recursively:</p><pre><code>(define fact 
+  (lambda (n)
+    (if (zero? n) 1 (* n (fact (- n 1))))))
+</code></pre><p>Theoretically, if our language suddenly loses recursion as a feature we run into a big problem; we can’t refer to a function that is not bound! There is no ‘self’ keyword inside a anonymous function (which would let us reference the function from within) and therefore the function will no longer be valid:</p><pre><code>(lambda (n)
+  (if (zero? n) 1 (* n (??? (- n 1)))))
+</code></pre><p>To clarify, the function is actually valid, but only for an input of <strong>0</strong>:</p><pre><code>; 0 -&gt; 1
+
+((lambda (n)
+  (if (zero? n) 1 (* n (??? (- n 1))))) 0)
+</code></pre><p>But if we try with any other value, it will fail:</p><pre><code>; 1 -&gt; error: unbound symbol (???)
+
+((lambda (n)
+  (if (zero? n) 1 (* n (??? (- n 1))))) 1)
+</code></pre><p>An input of <strong>1</strong> does not fulfill the first condition <strong>(zero?)</strong>, so it attempts to call <strong>???</strong> with <strong>(- n 1)</strong> as it’s argument. <strong>???</strong> is a symbol not bound to anything so an error is raised. However, we do know that for the current call the expression <strong>(- n 1)</strong> is equal to <strong>0</strong>, since <strong>n</strong> is bound to <strong>1</strong>. We know this function works for zero, so we know we can simply substitute it in for <strong>???</strong>. Now we have a function that works for two inputs: 0 and 1:</p><pre><code>((lambda (n)
+  (if (zero? n)
+      1
+      (* n ((lambda (n)
+              (if (zero? n) 1 (* n (??? (- n 1))))) (- n 1))))) 1)
+</code></pre><p>Using the former logic we can continue this process, replacing <strong>???</strong> with our ‘factorial’ lambda; creating a function that can work with another successive input. This could get tedious, so let’s write a function that does that for us. It will consume a function (f) and return the factorial function, replacing <strong>???</strong> with the input (f). If we provide this new function a factorial function it will have a factorial function to run if the term is not <strong>0</strong>.</p><pre><code>(define fact-gen
+  (lambda (f)
+    (lambda (n)
+      (if (zero? n) 1 (* n (f (- n 1)))))))
+</code></pre><p>By itself, the return value is our <strong>fact0</strong> function, which we used unbound earlier, Since an input of 0 doesnt call the <strong>f</strong> function, we can pass anything we’d like.</p><pre><code>(define fact0 (fact-gen &#39;trash))
+ -&gt; (lambda (next)
+      (lambda (n)
+        (if (zero? n) 1 (* n (&#39;trash (- n 1))))))
+
+(fact0 0) -&gt; 1
+</code></pre><p>However, due to the conditional statement, if input is greater than <strong>0</strong>, the argument will be called, and that’s simply impossible as it is currently is just a <strong>‘trash</strong> symbol.</p><pre><code>(fact0 1) -&gt; ERROR
+</code></pre><p>We need to supply a function that will give us the factorial of <strong>(- 1 1)</strong>. Wait a second… That expression equals <strong>0</strong>… We already have a function that gives us the factorial of <strong>0</strong>… Let’s run <strong>fact-gen</strong> and pass it <strong>fact0</strong>.</p><pre><code>(define fact&lt;=1 (fact-gen fact0))
+</code></pre><p>Using this newly generated function, we can find the factorial of any number equal or less than one. Can we continue? In fact, yes!</p><pre><code>(define fact&lt;=2 (fact-gen fact&lt;=1))
+</code></pre><p>Now the next step is clear. We need to supply the consecutive factorial function to the previous factorial function n + 1 times (starting at 0). How can we continually feed the <strong>fact-gen</strong> function these next factorial functions? Turns out that a combinator function can do that for us:</p><pre><code>(define combinator
+  (lambda (func)
+
+    (define make-step
+      (lambda (next-step)
+        (lambda (arg)
+          ((func (next-step next-step)) arg))))
+
+    (lambda (arg)
+      ((func (make-step make-step)) arg))))
+</code></pre><p>Notice that the returned lambda at the end of <strong>combinator</strong> function and the returned lambda for the locally scoped function <strong>make-step</strong>, are exactly the same. This is crucial. That means that when the generated factorial function needs the next factorial function, it simply inserts itself again. Let’s walk through this. Running <strong>(combinator fact-gen)</strong> will return:</p><pre><code>; figure-1
+(lambda (arg)
+  ((fact-gen (make-step make-step)) arg))
+</code></pre><p>When this function is called with any argument it will first resolve the expression <strong>(make-step make-step)</strong>. This function call will return the following:</p><pre><code>; figure-2
+(lambda (arg)
+  ((fact-gen (make-step make-step)) arg))
+</code></pre><p>Does this look familiar? Its the same as before! This is the fixed point. As seen in <strong>figure-1</strong>, this lambda (figure-2) will serve as the argument for the <strong>(fact-gen figure-2)</strong> function call, which returns:</p><pre><code>; figure-3
+(lambda (n)
+      (if (zero? n) 1 (* n (figure-2 (- n 1)))))
+</code></pre><p>Let’s call it with the argument of number ‘1’: <strong>(figure-3 1)</strong>. Since 1 is not <strong>zero?</strong> the control flow will evaluate the next expression: <em><em>(</em> 1 (figure-2 (- 1 1)))</em>*. Which includes the function call <strong>(figure-2 (- 1 1))</strong>. This will return the following:</p><pre><code>((fact-gen (make-step make-step)) arg)
+</code></pre><p><strong>(make-step make-step)</strong> will again return:</p><pre><code>; figure-4
+(lambda (arg)
+  ((fact-gen (make-step make-step)) arg))
+</code></pre><p>and the whole <strong>figure-2</strong> call will evaluate to:</p><pre><code>; figure-5
+(lambda (n)
+      (if (zero? n) 1 (* n (figure-4 (- n 1)))))
+</code></pre><p>Just to clarify, we are currently evaluating <em><em>(</em> 1 (figure-2 (- 1 1)))</em>*. <strong>n</strong> is bound to <strong>0</strong> in <strong>figure-5</strong>, so the <strong>if</strong> expression returns 1. Therefore everything resolves to:</p><pre><code>(* 1 1) -&gt; 1
+</code></pre><p>And that’s pretty much it. We can simplify the whole thing by eliminating our locale definition of <strong>make-step</strong> and replacing our readable variables with single letters:</p><pre><code>(define Z
+  (lambda (f)
+      (lambda (a)
+        ((f ((lambda (y) (lambda (a) ((f (y y)) a)))
+             (lambda (y) (lambda (a) ((f (y y)) a))))) a))))
+</code></pre></div><div id="author-bio"></div><nav id="post-navigation"><a href="https://tech.davidgorski.ca/custom-stl-compatible-iterators.html" rel="prev">&larr; Previous (Custom STL Compatible Iterators) </a><a href="https://tech.davidgorski.ca/back-end-development-basics.html" rel="next">Next (Back-End Development Basics) &rarr;</a></nav><div id="related-posts"><h3>Author:</h3><div><section><h4><a href="https://tech.davidgorski.ca/collector-functions-in-scheme.html">Collector Functions in Scheme</a></h4><p></p></section></div></div></div></main><footer></footer><script async src="https://tech.davidgorski.ca/assets/js/scripts.js?v=3733efd39cd6c799b95c8fcb96993840"></script></body></html>
