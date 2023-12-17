@@ -3,7 +3,7 @@
     <title>David Gorski&#x27;s Tech Blog</title>
     <link href="https://tech.davidgorski.ca/feed.xml" rel="self" />
     <link href="https://tech.davidgorski.ca" />
-    <updated>2023-12-17T14:42:06-05:00</updated>
+    <updated>2023-12-17T14:44:11-05:00</updated>
     <author>
         <name>David Gorski</name>
     </author>
@@ -17,12 +17,12 @@
         <link href="https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search.html"/>
         <id>https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search.html</id>
 
-        <updated>2023-12-17T14:42:06-05:00</updated>
+        <updated>2023-12-17T14:44:11-05:00</updated>
             <summary></summary>
         <content type="html">
             <![CDATA[
                 <p>Once you delve into the realm of low-latency C++, you will find yourself waking up in the middle of the night, sweating profusely from a nightmare concerning uncessary branching. And soon after, you begin to over-optimize your code to avoid branches. Even when that part of your code is clearly not the bottleneck.</p>
-<p>This is a short post presenting a C++ iterator-friendly implemention of a branchless binary search implemention. It is short and sweet, so I will reveal it before some editorial comments and thanks:</p>
+<p>This is a short post presenting a C++ iterator-friendly implementation of a branchless binary search implementation. It is short and sweet, so I will reveal it before some editorial comments and thanks:</p>
 <pre><code>template&lt;typename It&gt;
 It lower_bound(It begin, It end, const typename It::value_type&amp; value) {
   auto len = std::distance(begin, end);
