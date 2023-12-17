@@ -3,7 +3,7 @@
     <title>David Gorski&#x27;s Tech Blog</title>
     <link href="https://tech.davidgorski.ca/feed.xml" rel="self" />
     <link href="https://tech.davidgorski.ca" />
-    <updated>2023-12-17T14:36:29-05:00</updated>
+    <updated>2023-12-17T14:42:06-05:00</updated>
     <author>
         <name>David Gorski</name>
     </author>
@@ -17,7 +17,7 @@
         <link href="https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search.html"/>
         <id>https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search.html</id>
 
-        <updated>2023-12-17T14:36:29-05:00</updated>
+        <updated>2023-12-17T14:42:06-05:00</updated>
             <summary></summary>
         <content type="html">
             <![CDATA[
@@ -165,7 +165,7 @@ array size = 536870912
 branchlessTime = 38944000
 stdTime        = 22946000
 </code></pre>
-<p>As you can see it benefits start to deteriorate as the array size grows.</p>
+<p>As you can see the benefits start to deteriorate as the array size grows.</p>
 
             ]]>
         </content>
