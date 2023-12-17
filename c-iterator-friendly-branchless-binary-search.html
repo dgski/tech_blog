@@ -1,0 +1,132 @@
+<!DOCTYPE html><html lang="en-us" data-theme="light"><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><title>C++ Iterator-Friendly Branchless Binary Search - David Gorski&#x27;s Tech Blog</title><meta name="generator" content="Publii Open-Source CMS for Static Site"><link rel="canonical" href="https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search.html"><link rel="alternate" type="application/atom+xml" href="https://tech.davidgorski.ca/feed.xml"><link rel="alternate" type="application/json" href="https://tech.davidgorski.ca/feed.json"><meta property="og:title" content="C++ Iterator-Friendly Branchless Binary Search"><meta property="og:site_name" content="David Gorski's Tech Blog"><meta property="og:description" content=""><meta property="og:url" content="https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search.html"><meta property="og:type" content="article"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Merriweather&display=swap" rel="stylesheet"><link rel="stylesheet" href="https://unpkg.com/@picocss/pico@latest/css/pico.min.css"><link rel="stylesheet" href="https://tech.davidgorski.ca/assets/css/style.css?v=0a84ec904691ac8314428f82627e777a"><script type="application/ld+json">{"@context":"http://schema.org","@type":"Article","mainEntityOfPage":{"@type":"WebPage","@id":"https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search.html"},"headline":"C++ Iterator-Friendly Branchless Binary Search","datePublished":"2023-12-17T14:32","dateModified":"2023-12-17T14:36","description":"","author":{"@type":"Person","name":"David Gorski","url":"https://tech.davidgorski.ca/authors/david-gorski/"},"publisher":{"@type":"Organization","name":"David Gorski"}}</script><script async defer="defer" data-website-id="f50301b5-5202-4a86-9509-d0a3ed6ed290" src="https://analytics.xantasoft.com/umami.js"></script></head><body><nav class="container-fluid"><ul><li><strong><a id="logo" href="https://tech.davidgorski.ca/">David Gorski&#x27;s Tech Blog</a></strong></li></ul><ul><li><a href="https://davidgorski.ca">About</a></li></ul></nav><main class="container"><div><header><hgroup><h1>C++ Iterator-Friendly Branchless Binary Search</h1><h3><time datetime="2023-12-17T14:32">Dec 17th 2023 </time>By <a href="https://davidgorski.ca" rel="author" title="David Gorski">David Gorski</a></h3></hgroup></header><div id="post-entry"><p>Once you delve into the realm of low-latency C++, you will find yourself waking up in the middle of the night, sweating profusely from a nightmare concerning uncessary branching. And soon after, you begin to over-optimize your code to avoid branches. Even when that part of your code is clearly not the bottleneck.</p><p>This is a short post presenting a C++ iterator-friendly implemention of a branchless binary search implemention. It is short and sweet, so I will reveal it before some editorial comments and thanks:</p><pre><code>template&lt;typename It&gt;
+It lower_bound(It begin, It end, const typename It::value_type&amp; value) {
+  auto len = std::distance(begin, end);
+  while (len &gt; 1) {
+    const auto halfLen = len / 2;
+    const auto middle = *(begin + halfLen - 1);
+    begin += (middle &lt; value) * halfLen;
+    len -= halfLen;
+  }
+  return begin;
+}
+</code></pre><p>This implementation uses a <code>begin</code> iterator and <code>len</code> integer to keep track of the search space rather than begin and end pointers/indices. So the first two lines of the function are simply using the provided iterators to derive the needed variables. All classic binary search branches within the <code>while</code> loop body have been removed:</p><ul><li>Shrinking the search space length without branches is easy; it will always halve. We can do this safely by subtracting <code>halfLen</code> from the remaining <code>len</code> (This will potentially leave an array of size 1).</li><li>Calculating the new search space start is more tricky. It will either be the same <code>begin</code> as now, or be the halfway point between pos and the end of the search space. So we conditionally add <code>halfLen</code> to <code>begin</code>.</li></ul><p>For the most part, this implementation will have superior performance to <code>std::lower_bound</code>. There is caveat: since the addition to <code>begin</code> will most likely be turned into a <code>CMOV</code> instruction rather than a proper branch, there will be no prediction to preload the next search space mid-points and at larger array sizes, a classic approach will prevail. This can potentially be mitigated on some platforms by adding an explicit <code>prefetch</code> instruction.</p><p>Thanks to <a href="https://en.algorithmica.org/hpc/data-structures/binary-search/">this article</a> for outlining this concept using raw arrays.</p><h2 id="benchmarks">Benchmarks</h2><p>Nanoseconds taken to find 1000 random numbers that are in the range on Macbook Air M1. <a href="https://gist.github.com/dgski/c48142bcb96cc3bf0bf14fe1072e403f">Code</a>.</p><pre><code>=============================
+array size = 1
+branchlessTime = 15000
+stdTime        = 16000
+=============================
+array size = 2
+branchlessTime = 15000
+stdTime        = 26000
+=============================
+array size = 4
+branchlessTime = 15000
+stdTime        = 31000
+=============================
+array size = 8
+branchlessTime = 16000
+stdTime        = 42000
+=============================
+array size = 16
+branchlessTime = 17000
+stdTime        = 50000
+=============================
+array size = 32
+branchlessTime = 17000
+stdTime        = 58000
+=============================
+array size = 64
+branchlessTime = 18000
+stdTime        = 66000
+=============================
+array size = 128
+branchlessTime = 19000
+stdTime        = 77000
+=============================
+array size = 256
+branchlessTime = 20000
+stdTime        = 91000
+=============================
+array size = 512
+branchlessTime = 23000
+stdTime        = 99000
+=============================
+array size = 1024
+branchlessTime = 25000
+stdTime        = 108000
+=============================
+array size = 2048
+branchlessTime = 28000
+stdTime        = 118000
+=============================
+array size = 4096
+branchlessTime = 31000
+stdTime        = 125000
+=============================
+array size = 8192
+branchlessTime = 35000
+stdTime        = 130000
+=============================
+array size = 16384
+branchlessTime = 37000
+stdTime        = 139000
+=============================
+array size = 32768
+branchlessTime = 43000
+stdTime        = 138000
+=============================
+array size = 65536
+branchlessTime = 51000
+stdTime        = 159000
+=============================
+array size = 131072
+branchlessTime = 62000
+stdTime        = 178000
+=============================
+array size = 262144
+branchlessTime = 72000
+stdTime        = 193000
+=============================
+array size = 524288
+branchlessTime = 79000
+stdTime        = 205000
+=============================
+array size = 1048576
+branchlessTime = 90000
+stdTime        = 236000
+=============================
+array size = 2097152
+branchlessTime = 162000
+stdTime        = 305000
+=============================
+array size = 4194304
+branchlessTime = 529000
+stdTime        = 570000
+=============================
+array size = 8388608
+branchlessTime = 905000
+stdTime        = 764000
+=============================
+array size = 16777216
+branchlessTime = 1496000
+stdTime        = 892000
+=============================
+array size = 33554432
+branchlessTime = 1360000
+stdTime        = 1610000
+=============================
+array size = 67108864
+branchlessTime = 1340000
+stdTime        = 1312000
+=============================
+array size = 134217728
+branchlessTime = 1815000
+stdTime        = 1725000
+=============================
+array size = 268435456
+branchlessTime = 2255000
+stdTime        = 2376000
+=============================
+array size = 536870912
+branchlessTime = 38944000
+stdTime        = 22946000
+</code></pre><p>As you can see it benefits start to deteriorate as the array size grows.</p></div><div id="author-bio"></div><nav id="post-navigation"><a href="https://tech.davidgorski.ca/truncating-string-white-space-at-compile-time-in-c.html" rel="prev">&larr; Previous (Truncating String White-space At Compile Time in C++)</a></nav></div></main><footer></footer><script async src="https://tech.davidgorski.ca/assets/js/scripts.js?v=3733efd39cd6c799b95c8fcb96993840"></script></body></html>
