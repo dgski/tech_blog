@@ -3,7 +3,7 @@
     <title>David Gorski&#x27;s Tech Blog</title>
     <link href="https://tech.davidgorski.ca/feed.xml" rel="self" />
     <link href="https://tech.davidgorski.ca" />
-    <updated>2023-12-17T14:44:11-05:00</updated>
+    <updated>2023-12-18T09:36:35-05:00</updated>
     <author>
         <name>David Gorski</name>
     </author>
@@ -17,153 +17,157 @@
         <link href="https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search.html"/>
         <id>https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search.html</id>
 
-        <updated>2023-12-17T14:44:11-05:00</updated>
+        <updated>2023-12-18T09:36:35-05:00</updated>
             <summary></summary>
         <content type="html">
             <![CDATA[
-                <p>Once you delve into the realm of low-latency C++, you will find yourself waking up in the middle of the night, sweating profusely from a nightmare concerning uncessary branching. And soon after, you begin to over-optimize your code to avoid branches. Even when that part of your code is clearly not the bottleneck.</p>
+                <p>Once you delve into the realm of low-latency C++, you will find yourself waking up in the middle of the night, sweating profusely from a nightmare concerning unnecessary branching. And soon after, you begin to over-optimize your code to avoid branches. Even when that part of your code is clearly not the bottleneck.</p>
 <p>This is a short post presenting a C++ iterator-friendly implementation of a branchless binary search implementation. It is short and sweet, so I will reveal it before some editorial comments and thanks:</p>
 <pre><code>template&lt;typename It&gt;
 It lower_bound(It begin, It end, const typename It::value_type&amp; value) {
   auto len = std::distance(begin, end);
-  while (len &gt; 1) {
-    const auto halfLen = len / 2;
-    const auto middle = *(begin + halfLen - 1);
-    begin += (middle &lt; value) * halfLen;
-    len -= halfLen;
+  if (len == 0) {
+    return end;
   }
-  return begin;
+
+  while (len &gt; 1) {
+    const auto half = len / 2;
+    begin += (*(begin + half - 1) &lt; value) * half;
+    len -= half;
+  }
+  return (*begin &lt; value) ? end : begin;
 }
 </code></pre>
-<p>This implementation uses a <code>begin</code> iterator and <code>len</code> integer to keep track of the search space rather than begin and end pointers/indices. So the first two lines of the function are simply using the provided iterators to derive the needed variables. All classic binary search branches within the <code>while</code> loop body have been removed:</p>
+<p>This implementation uses a <code>begin</code> iterator and <code>len</code> integer to keep track of the search space rather than begin and end pointers/indices. So the first line of the function are simply using the provided iterators to derive the needed variables. We terminate early if the range is empty. All classic binary search branches within the <code>while</code> loop body have been removed:</p>
 <ul>
 <li>Shrinking the search space length without branches is easy; it will always halve. We can do this safely by subtracting <code>halfLen</code> from the remaining <code>len</code> (This will potentially leave an array of size 1).</li>
 <li>Calculating the new search space start is more tricky. It will either be the same <code>begin</code> as now, or be the halfway point between pos and the end of the search space. So we conditionally add <code>halfLen</code> to <code>begin</code>.</li>
+<li>To conform to the <code>std::lower_bound</code> interface, we must return the end iterator if the value is not found within the range. To do so, unfortunately we must add a final conditional at the end of the function. Thanks to <a href="https://www.linkedin.com/in/farid-mehrabi/">Farhid Mehrabi</a> for pointing this bug out in my initial implementation (I would potentially return a value that is less than the value, breaking the lower bound contract). Adding a simple unit test would have prevented my from doing so, so this a reminder to myself to do so even for small pieces of code.</li>
 </ul>
 <p>For the most part, this implementation will have superior performance to <code>std::lower_bound</code>. There is caveat: since the addition to <code>begin</code> will most likely be turned into a <code>CMOV</code> instruction rather than a proper branch, there will be no prediction to preload the next search space mid-points and at larger array sizes, a classic approach will prevail. This can potentially be mitigated on some platforms by adding an explicit <code>prefetch</code> instruction.</p>
-<p>Thanks to <a href="https://en.algorithmica.org/hpc/data-structures/binary-search/">this article</a> for outlining this concept using raw arrays.</p>
+<p>Thanks to <a href="https://en.algorithmica.org/hpc/data-structures/binary-search/">this amazing article</a> for outlining this concept using raw arrays.</p>
 <h2 id="benchmarks">Benchmarks</h2>
 <p>Nanoseconds taken to find 1000 random numbers that are in the range on Macbook Air M1. <a href="https://gist.github.com/dgski/c48142bcb96cc3bf0bf14fe1072e403f">Code</a>.</p>
 <pre><code>=============================
 array size = 1
-branchlessTime = 15000
-stdTime        = 16000
+branchlessTime = 18000
+stdTime        = 18000
 =============================
 array size = 2
-branchlessTime = 15000
-stdTime        = 26000
+branchlessTime = 18000
+stdTime        = 30000
 =============================
 array size = 4
-branchlessTime = 15000
-stdTime        = 31000
+branchlessTime = 19000
+stdTime        = 39000
 =============================
 array size = 8
-branchlessTime = 16000
-stdTime        = 42000
+branchlessTime = 19000
+stdTime        = 48000
 =============================
 array size = 16
-branchlessTime = 17000
-stdTime        = 50000
+branchlessTime = 20000
+stdTime        = 59000
 =============================
 array size = 32
-branchlessTime = 17000
-stdTime        = 58000
+branchlessTime = 21000
+stdTime        = 69000
 =============================
 array size = 64
-branchlessTime = 18000
-stdTime        = 66000
+branchlessTime = 21000
+stdTime        = 78000
 =============================
 array size = 128
-branchlessTime = 19000
-stdTime        = 77000
-=============================
-array size = 256
-branchlessTime = 20000
+branchlessTime = 22000
 stdTime        = 91000
 =============================
+array size = 256
+branchlessTime = 24000
+stdTime        = 103000
+=============================
 array size = 512
-branchlessTime = 23000
-stdTime        = 99000
+branchlessTime = 28000
+stdTime        = 113000
 =============================
 array size = 1024
-branchlessTime = 25000
-stdTime        = 108000
+branchlessTime = 31000
+stdTime        = 127000
 =============================
 array size = 2048
-branchlessTime = 28000
-stdTime        = 118000
+branchlessTime = 35000
+stdTime        = 139000
 =============================
 array size = 4096
-branchlessTime = 31000
-stdTime        = 125000
+branchlessTime = 38000
+stdTime        = 146000
 =============================
 array size = 8192
-branchlessTime = 35000
-stdTime        = 130000
+branchlessTime = 42000
+stdTime        = 140000
 =============================
 array size = 16384
-branchlessTime = 37000
+branchlessTime = 40000
 stdTime        = 139000
 =============================
 array size = 32768
-branchlessTime = 43000
-stdTime        = 138000
+branchlessTime = 45000
+stdTime        = 149000
 =============================
 array size = 65536
-branchlessTime = 51000
-stdTime        = 159000
+branchlessTime = 64000
+stdTime        = 189000
 =============================
 array size = 131072
-branchlessTime = 62000
-stdTime        = 178000
+branchlessTime = 79000
+stdTime        = 216000
 =============================
 array size = 262144
-branchlessTime = 72000
-stdTime        = 193000
+branchlessTime = 91000
+stdTime        = 233000
 =============================
 array size = 524288
-branchlessTime = 79000
-stdTime        = 205000
+branchlessTime = 105000
+stdTime        = 260000
 =============================
 array size = 1048576
-branchlessTime = 90000
-stdTime        = 236000
+branchlessTime = 195000
+stdTime        = 351000
 =============================
 array size = 2097152
-branchlessTime = 162000
-stdTime        = 305000
+branchlessTime = 142000
+stdTime        = 333000
 =============================
 array size = 4194304
-branchlessTime = 529000
-stdTime        = 570000
+branchlessTime = 397000
+stdTime        = 444000
 =============================
 array size = 8388608
-branchlessTime = 905000
-stdTime        = 764000
+branchlessTime = 931000
+stdTime        = 961000
 =============================
 array size = 16777216
-branchlessTime = 1496000
-stdTime        = 892000
+branchlessTime = 1159000
+stdTime        = 996000
 =============================
 array size = 33554432
-branchlessTime = 1360000
-stdTime        = 1610000
+branchlessTime = 1327000
+stdTime        = 1132000
 =============================
 array size = 67108864
-branchlessTime = 1340000
-stdTime        = 1312000
+branchlessTime = 1507000
+stdTime        = 1578000
 =============================
 array size = 134217728
-branchlessTime = 1815000
-stdTime        = 1725000
+branchlessTime = 1603000
+stdTime        = 1710000
 =============================
 array size = 268435456
-branchlessTime = 2255000
-stdTime        = 2376000
+branchlessTime = 5921000
+stdTime        = 5980000
 =============================
 array size = 536870912
-branchlessTime = 38944000
-stdTime        = 22946000
+branchlessTime = 23558000
+stdTime        = 15002000
 </code></pre>
 <p>As you can see the benefits start to deteriorate as the array size grows.</p>
 
