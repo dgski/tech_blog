@@ -3,12 +3,149 @@
     <title>David Gorski&#x27;s Tech Blog</title>
     <link href="https://tech.davidgorski.ca/feed.xml" rel="self" />
     <link href="https://tech.davidgorski.ca" />
-    <updated>2023-12-18T09:36:35-05:00</updated>
+    <updated>2024-01-09T22:06:22-05:00</updated>
     <author>
         <name>David Gorski</name>
     </author>
     <id>https://tech.davidgorski.ca</id>
 
+    <entry>
+        <title>C++ Pattern: Deriving From std::variant</title>
+        <author>
+            <name>David Gorski</name>
+        </author>
+        <link href="https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant.html"/>
+        <id>https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant.html</id>
+
+        <updated>2024-01-09T22:06:22-05:00</updated>
+            <summary></summary>
+        <content type="html">
+            <![CDATA[
+                <p>I am a big fan of sum types for expressive programming. They provide an elegant way to encode mutually exclusive data types in a single field. While not provided by the language itself, the C++ standard library offers us <code>std::variant</code>. Since there is no language-level pattern matching construct, interacting with variants can be less than ergonomic. One way to mitigate this is inheriting from <code>std::variant</code> and creating useful domain-specific access methods. This article discusses a few different ways of deriving from <code>std::variant</code> that might be useful and/or interesting.</p>
+<h2 id="a-result-type">A Result Type</h2>
+<p>To start off we’ll create a ~15 line class derived from <code>std::variant</code> that fulfills the basics of a result type (something like C++23 <code>std::expected</code> but available in C++17 and above). This is a nice way to encapsulate success and failures types in a united interface. Implementation:</p>
+<pre><code class="language-c++">#include &lt;variant&gt;
+
+template&lt;typename T, typename Error&gt;
+class Result : public std::variant&lt;T, Error&gt; {
+public:
+  using std::variant&lt;T, Error&gt;::variant;
+  using std::variant&lt;T, Error&gt;::operator=;
+  
+    Error* error() { return std::get_if&lt;Error&gt;(this); }
+    const Error* error() const { return std::get_if&lt;Error&gt;(this); }
+    T* value() { return std::get_if&lt;T&gt;(this); }
+    const T* value() const { return std::get_if&lt;T&gt;(this); }
+    T* operator-&gt;() { return value(); }
+    const T* operator-&gt;() const { return value(); }
+    operator bool() const { return error() == nullptr; }
+};
+</code></pre>
+<p>We derive from <code>std::variant</code> to take advantage of the ergonomic constructors and assignment operators (meaning we don’t have to implement them for each type and each reference type; doing this correctly is tedious). After this, we add two convenient methods to access the underlying types (along with const overloads). And finally, define <code>operator-&gt;</code> to allow access to the underlying success type value and <code>operator bool</code> to determine whether it holds the success type (along with const overloads).</p>
+<p>To demonstrate basic usage we can create a small type hierarchy with success and failure types:</p>
+<pre><code class="language-c++">struct SuccessResult {
+  int date;
+  double time;
+};
+struct ErrorResult {
+  std::string message;
+};
+using ProcessResult = Result&lt;SuccessResult, ErrorResult&gt;;
+</code></pre>
+<p>Then we create a function to demonstate it’s usage:</p>
+<pre><code>ProcessResult process(std::string_view input) {
+  return ErrorResult{ &quot;Not implemented&quot; };
+}
+</code></pre>
+<p>And finally we call the function and write some code that observes the return value:</p>
+<pre><code>const auto result = process(&quot;Hello&quot;);
+if (!result) {
+  std::cout &lt;&lt; &quot;Error: &quot; &lt;&lt; result.error()-&gt;message &lt;&lt; std::endl;
+} else {
+  std::cout &lt;&lt; &quot;Date: &quot; &lt;&lt; result-&gt;date &lt;&lt; &quot; Time: &quot; &lt;&lt; result-&gt;time &lt;&lt; std::endl;
+}
+</code></pre>
+<p>Overall, this approach is highly ergonomic, concise and clear. The call site is easily understood since <code>operator bool</code> cleanly checks the status, <code>operator -&gt;</code> eliminates unnecessary intermediate variables and method calls. The <code>error()</code> access method is also self-explanatory.</p>
+<h2 id="data-or-pointer-to-data">Data Or Pointer to Data</h2>
+<p>Another potentially useful class we can build is <code>DataOrPointer</code>. This is a class that either holds a type or a pointer to that type. Again we provide ergonomic access methods and operators:</p>
+<pre><code class="language-c++">template&lt;typename T&gt;
+class DataOrPointer : public std::variant&lt;T, T*&gt; {
+public:
+  using std::variant&lt;T, T*&gt;::variant;
+  using std::variant&lt;T, T*&gt;::operator=;
+  operator const T&amp;() const {
+    if (auto value = std::get_if&lt;T&gt;(this); value) {
+      return *value;
+    }
+    return *std::get&lt;T*&gt;(*this);
+  }
+};
+</code></pre>
+<p>You can use this if you want to provide a single return type to a function that takes a <code>T</code> as an argument and may or may not return a newly constructed <code>T</code> object after testing some conditions. If constructing <code>T</code> is expensive, this approach can be a clean way to achieve the objective. An real-world example of this could be normalizing two BigFloats to use the same exponent before operating on them. If the target exponent is equal to the current exponent, it would be a waste to build a new copy (In this case we can’t mutate the original numbers).</p>
+<pre><code>DataOrPointer&lt;const UnsignedBigFloat&gt; usingExponent(const UnsignedBigFloat&amp; value, int64_t exponent)  {
+    if (exponent == value._exponent) {
+        return DataOrPointer&lt;const UnsignedBigFloat&gt;(&amp;value);
+     }
+
+    auto copy = value;
+    copy._mantissa.timesTenToThe(exponent - value._exponent);
+    copy._exponent = exponent;
+    return std::move(copy);
+}
+</code></pre>
+<h2 id="multi-type-reference">Multi-Type Reference</h2>
+<p>I will admit the following example is almost too esoteric to be useful, but I have actually reached for this once before.</p>
+<p>The challenge: create a reference that can bind to one of multiple types, performance not being critical and reducing code duplication being the main objective.</p>
+<p>Solution:</p>
+<pre><code class="language-c++">template&lt;typename... Ts&gt;
+class MultiTypeReference : public std::variant&lt;Ts*...&gt; {
+public:
+  using std::variant&lt;Ts*...&gt;::variant;
+
+  template&lt;typename T&gt;
+  auto&amp; operator=(T value) {
+    std::visit([&amp;](auto&amp; pointer) { *pointer = value; }, *this);
+    return *this;
+  }
+
+  template&lt;typename T&gt;
+  operator T() {
+    return std::visit([&amp;](auto&amp; pointer) { return T(*pointer); }, *this);
+  }
+</code></pre>
+<p>Yes, this works. Yes, it’s weird. No, I don’t encourage you to use it. However, it is an interesting case study and hopefully gets you thinking about how to stretch the use of <code>std::variant</code>. Here’s how one would actually use it:</p>
+<pre><code>struct Data {
+   bool useFieldA;
+   int32_t A;
+     int64_t B;
+};
+
+MultiTypeReference&lt;int32_t, int64_t&gt; getRelevantField(Data&amp; data) {
+    return data.useFieldA ?
+          MultiTypeReference&lt;int32_t, int64_t&gt;(data.A) :
+          MultiTypeReference&lt;int32_t, int64_t&gt;(data.B);
+}
+
+void assignOne(Data&amp; one) {
+  getRelevantField(one) = 1;
+}
+</code></pre>
+<p>At the end of the day, yes, this simply hides the conditional access and assignment behind some abstractions. But in use, it behaves exactly how we want it: a reference to one of multiple types.</p>
+<h2 id="epilogue">Epilogue</h2>
+<p>The reason I included the word ‘Pattern’ in the title is because these ideas can be extended to theoretically endless types and custom access methods.</p>
+<p>For examples, you could build a result type with three different possible types and provide access methods for them (removing <code>operator-&gt;</code>). Or perhaps you provide a <code>transform</code> method that takes a functor and changes the value to hold a different type after transforming the current type. Or even just provide custom comparison operators (Which could be necessary for sorting different numeric types; imagine you want to sort a vector of regular int and BigInt references stored within a variant-type).</p>
+<p>In review, the key tools to leverage are:</p>
+<ol>
+<li>Using the constructors and assignment operators provided by <code>std::variant</code>.</li>
+<li>Defining named access methods for different types.</li>
+<li>Providing an <code>operator-&gt;</code> for a success or special type.</li>
+<li>Providing conversion operators for syntax-less unpacking.</li>
+</ol>
+<p>I hope my discussion of these concepts was useful or at least interesting. Thanks for reading! Subscribe via RSS or <a href="https://www.linkedin.com/in/dgski/">LinkedIn</a>.</p>
+
+            ]]>
+        </content>
+    </entry>
     <entry>
         <title>C++ Iterator-Friendly Branchless Binary Search</title>
         <author>
@@ -1156,259 +1293,6 @@ int main(void)
         std::cout &lt;&lt; t &lt;&lt; std::endl;
 }   
 </code></pre>
-
-            ]]>
-        </content>
-    </entry>
-    <entry>
-        <title>Cookie-based Session Management</title>
-        <author>
-            <name>David Gorski</name>
-        </author>
-        <link href="https://tech.davidgorski.ca/cookie-based-session-management.html"/>
-        <id>https://tech.davidgorski.ca/cookie-based-session-management.html</id>
-            <category term="sessions"/>
-            <category term="python"/>
-
-        <updated>2023-07-29T14:31:37-04:00</updated>
-            <summary></summary>
-        <content type="html">
-            <![CDATA[
-                <p>Web frameworks had held my hand. Which for a beginner was great, but a lot of the fundamental aspects of back-end development had been abstracted from me, and I found annoying discrepancies between my knowledge and know-how. Sessions were one element I had neglected. I had taken them for granted; somehow magically some level of state is maintained between the server and the client.</p>
-<p>It wasn’t till I started writing my <a href="https://github.com/dgski/baseketbase-agg">News Aggregator</a> Project in <a href="https://racket-lang.org">Racket</a> that I realized I don’t really know how sessions work. Racket’s a great language, but it’s not exactly popular and doesn’t have any web frameworks. I needed to learn and write my own session manager. So I did.</p>
-<p>How exactly does the server know whether a given client is logged in? Turns out it’s mainly about <strong>cookies</strong>. Cookies are small collections of data that the server asks the client to store. They are transmitted in the HTTP request headers under the <strong>Cookie</strong> section, and held by the browser on the client’s end. </p>
-<p>For sessions, the server generates a session id, tells the client to remember it, the client does so and attaches that sid to following requests, so the server knows whether a request belongs to an authenticated session or not.</p>
-<p>To better understand how this works; let’s write a simple HTTP request handler. We will use the basic web server provided in python’s <strong>http.server</strong> package. </p>
-<p>We will start with three elements:</p>
-<ul>
-<li>address: this is the address and port at which the server will listen for connections</li>
-<li>handler: this is a class which has the necessary methods to handle requests</li>
-<li>server: we will initialize the built-in <strong>HTTPServer</strong> object with our address and handler.</li>
-</ul>
-<p>Finally, we will start our server using the <strong>serve_forever()</strong> method:</p>
-<pre><code class="language-python">from http.server import *
-
-#Setup
-address = (&#39;&#39;, 8000)
-handler = BaseHTTPRequestHandler
-server = HTTPServer(address, handler)
-
-#Start
-server.serve_forever()
-</code></pre>
-<p>We can send a request to our new server using a browser at <strong>localhost:8000</strong>. However, we should still the following error:</p>
-<pre><code class="language-text">Error response
-
-Error code: 501
-
-Message: Unsupported method (&#39;GET&#39;).
-
-Error code explanation: HTTPStatus.NOT_IMPLEMENTED -
-Server does not support this operation.
-</code></pre>
-<p>Looks like our handler can’t handle simple <strong>GET</strong> requests… We need to do something about that. Define a new class at the top of the file. We still use <strong>BaseHTTPRequestHandler</strong> as the parent class, but add the <strong>do_GET()</strong> method:</p>
-<pre><code class="language-python">
-class SessionHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.response = 200
-        self.send_header(&#39;Content-type&#39;,&#39;text/html&#39;)
-        content = &quot;Hello&quot;
-        self.wfile.write(bytes(content, &quot;utf-8&quot;))
-</code></pre>
-<p>Remember to change the handler to our new class:</p>
-<pre><code class="language-python">handler = SessionHandler
-</code></pre>
-<h2 id="dispatching">Dispatching</h2>
-<p>Now if you visit again with your browser, you should now see the raw text, “Hello” displayed. That’s a good start, but we need our server to do different things based on different URL paths. Let’s add a simple dispatcher and methods to handle the paths:</p>
-<pre><code class="language-python">class SessionHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        routes = {
-            &quot;/login&quot;:   self.login,
-            &quot;/logout&quot;:  self.logout,
-            &quot;/&quot;:        self.home
-        }
-        try:
-            response = 200
-            content = routes[self.path]()
-        except:
-            response = 404
-            content = &quot;Not Found&quot;
-            
-        self.send_response(response)
-        self.send_header(&#39;Content-type&#39;,&#39;text/html&#39;)
-        self.end_headers()
-        self.wfile.write(bytes(content, &quot;utf-8&quot;))
-        return
-    
-    def home(self):
-        return &quot;Welcome Home&quot;
-
-    def login(self):
-        # todo: perform login
-        return &quot;Logged In&quot;
-
-    def logout(self):
-        # todo: perform logout
-        return &quot;Logged Out&quot;
-</code></pre>
-<p>Okay, things are taking shape. Let’s run through what was added:</p>
-<ul>
-<li>The <strong>routes</strong> dictionary has paths as keys and page methods as values.</li>
-<li>We use the <strong>try,except</strong> statement to try to access the methods using the path. If it works, we set <strong>response</strong> to 200 (success) and prepare our content. Otherwise, we set <strong>response</strong> to 404 (not found) and set content to <strong>Not Found</strong>.</li>
-<li>The home, login and logout methods return a text string representing themselves.</li>
-</ul>
-<h2 id="logging-in">Logging In</h2>
-<p>Now let’s implement our login process. After a user logs in, the time spent logged in is referred to as a <strong>session</strong>. For each login and consecutive logout, we will have a unique session id (sid). So obviously, our next immediate step is to generate a new <strong>sid</strong> when the user clicks on login. We will use a dictionary to store our sessions ids. Usually a database fulfills this role, but for our simple purposes, this should be enough. For incredibly basic security import the randint function:</p>
-<pre><code class="language-python">from random import randint
-</code></pre>
-<p>Add the following method to generate the sid:</p>
-<pre><code class="language-python">def generate_sid(self):
-    return &quot;&quot;.join(str(randint(1,9)) for _ in range(100))
-</code></pre>
-<p>Add a global dictionary to the top of the file:</p>
-<pre><code class="language-python">sessions = {}
-</code></pre>
-<p>Make the following changes to the <strong>login</strong> method:</p>
-<pre><code class="language-python">def login(self):
-    # Password normally be checked here
-    sid = self.generate_sid()
-    self.cookie = &quot;sid={}&quot;.format(sid)
-    sessions[sid] = {&quot;username&quot;, &quot;useragent&quot;,&quot;ip address&quot;,&quot;expiry&quot;}
-    return &quot;Logged In&quot;
-</code></pre>
-<p>Add the following <strong>send_header</strong> function calls to bottom of the <strong>do_GET</strong> method:</p>
-<pre><code class="language-python">def do_GET(self): 
-    #...
-    self.cookie = None # Addition
-    self.send_response(response)
-    self.send_header(&#39;Content-type&#39;,&#39;text/html&#39;)
-    if self.cookie:
-            self.send_header(&#39;Set-Cookie&#39;, self.cookie) # Addition
-    self.end_headers()
-    self.wfile.write(bytes(content, &quot;utf-8&quot;))
-    return
-</code></pre>
-<p>What is happening should be clear: <strong>login()</strong> is setting the <strong>self.cookie</strong> member variable to a random string of numbers, and <strong>self.send_header(‘Set-Cookie’, self.cookie)</strong> is sending it off as a cookie value. Now if you visit <strong>/login</strong> in your browser, and open up the web inspector, you should see <strong>sid</strong> as a cookie, with the value as whatever you generated. This cookie is held by the browser, and will be forwarded to our server with every request. It provides ‘context’ between requests.</p>
-<p>Also, notice that <strong>login()</strong> adds the sid to the dictionary as a key with a dummy dictionary <strong>{“username”, “useragent”,”ip address”,”expiry”}</strong> as a value. This is where a complete session manager would store those pieces of information about the user, to later verify the session. Add this on your own.</p>
-<h2 id="validating-users">Validating users</h2>
-<p>Now we need to perform the most fundamental aspect of session management: validating a session. Let’s say there is some content that only registered, logged in users can see. We don’t want our user to have to provide their password with each page request; That would be incredibly cumbersome. We need to check if a request contains a session and display the right thing. We need to extract a header’s sid to get that information. Add the following method to our <strong>SessionHandler</strong> class:</p>
-<pre><code class="language-python">def parse_cookies(self, cookie_list):
-    return dict(((c.split(&quot;=&quot;)) for c in cookie_list.split(&quot;;&quot;))) if cookie_list else {}
-</code></pre>
-<p>This will nicely extract the cookies string from the request and put it into a dictionary for our convenience. Also alter our <strong>do_GET</strong> <strong>try</strong> block so it looks like this:</p>
-<pre><code class="language-python">try:
-    response = 200
-    cookies = self.parse_cookies(self.headers[&quot;Cookie&quot;])
-    if &quot;sid&quot; in cookies:
-        self.user = cookies[&quot;sid&quot;] if (cookies[&quot;sid&quot;] in sessions) else False
-    else:
-        self.user = False
-    content = routes[self.path]()
-</code></pre>
-<p>Our home page should display whether a user is currently logged in:</p>
-<pre><code class="language-python">def home(self):
-        return &quot;Welcome User!&quot; if self.user else &quot;Welcome Stranger!&quot;
-</code></pre>
-<p>What is happening here? Take a closer look at the try block. There are a few interesting things happening within:</p>
-<ul>
-<li>As before, we are setting the response to code 200, which for a HTTP request, it means that the page was found</li>
-<li>Secondly, we are parsing the <strong>Cookie</strong> section of the header. Our <strong>parse_cookies</strong> method splits the Cookie string by “;” to seperate the individual cookies, then it puts the cookie ids and their values into a dictionary. If there are no cookies, it responds with an empty dictionary</li>
-<li>Next, our try block checks if “sid” is in the <strong>cookies</strong> dictionary. If it isn’t, it sets <strong>self.user</strong> to false. Otherwise, it then checks whether the sid value stored in the <strong>sessions</strong> global.</li>
-<li>From then on, it’s business as usual.</li>
-</ul>
-<p>We have altered a fundamental behaviour of our micro-program: when we visit the homepage without a generated sid cookie being broadcast by the browser we will see:</p>
-<pre><code class="language-text">&quot;Welcome Stranger!&quot;
-</code></pre>
-<p>Clearly, unless the sid is stored in the <strong>sessions</strong> dictionary, the application instance does not recognize the web user. But if the user logs in using the rudimentary <strong>/login</strong> page, it will display:</p>
-<pre><code class="language-text">&quot;Welcome User!&quot;
-</code></pre>
-<p>Try logging in, and then restarting our server. If you return to the home page, it won’t recognize you, even if the browser holds and sends a <strong>sid</strong> cookie. Because the dictionary dies with the process, our server completely forgets about the session. If you visit the <strong>login</strong> page again, a new <strong>sid</strong> is generated, and we get <strong>“Welcome User!”</strong>.</p>
-<p>To Recap: the login process generates a new sid, saves the users information(user agent, ip address, etc), and sends back a header asking for the user’s browser to remember the new sid. Of course to be useful in most cases,  you would have to validate a login password before generating the sid and continuing, but the fundamental aspects of session management are already present.</p>
-<h2 id="logging-out">Logging Out</h2>
-<p>What if the user wants to end their session? Well, we should probably give them a log out page as well. Let’s add something to our currently useless logout page:</p>
-<pre><code class="language-python">    def logout(self):
-        if not self.user:
-            return &quot;Can&#39;t Log Out: No User Logged In&quot;
-        self.cookie = &quot;sid=&quot;
-        del sessions[self.user]
-        return &quot;Logged Out&quot;
-</code></pre>
-<p>This method will check if a valid user is logged in, set the cookie to empty and delete the session id from the <strong>sessions</strong> dictionary, before returning the <strong>“Logged Out”</strong> text.</p>
-<p>Check out what happens now: restart our your server application, open it and validate the following happens in order:</p>
-<ol>
-<li>On First Visit of the home page <strong>“/“</strong> it should display: “Welcome Stranger!”.</li>
-<li>If you now visit <strong>“/login”</strong>, it should display “Logged In”, check your cookies for the “/“ domain, you should see an <strong>sid</strong> cookie with the newly generated session.</li>
-<li>Now if you visit the home page, your should see: “Welcome User!”. Congratulations, your session has been validated!</li>
-<li>Next test if the <strong>“/logout”</strong> page works. Visit it, it should say “Logged Out”. Make sure it worked by once again checking your cookies in your browser. The <strong>sid</strong> cookie should be empty.</li>
-<li>If you visit the home page again, it should display: “Welcome Stranger!”. You have successfully logged out.</li>
-</ol>
-<p>The complete code should now look like:</p>
-<pre><code class="language-python">from http.server import *
-from random import randint
-
-sessions = {}
-
-class SessionHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        routes = {
-            &quot;/login&quot;: self.login,
-            &quot;/logout&quot;: self.logout,
-            &quot;/&quot;: self.home
-        }
-        self.cookie = None
-        try:
-            response = 200
-            cookies = self.parse_cookies(self.headers[&quot;Cookie&quot;])
-            if &quot;sid&quot; in cookies:
-                self.user = cookies[&quot;sid&quot;] if (cookies[&quot;sid&quot;] in sessions) else False
-            else:
-                self.user = False
-            content = routes[self.path]()
-        except:
-            response = 404
-            content = &quot;Not Found&quot;
-        
-        self.send_response(response)
-        self.send_header(&#39;Content-type&#39;,&#39;text/html&#39;)
-
-        if self.cookie:
-            self.send_header(&#39;Set-Cookie&#39;, self.cookie)
-
-        self.end_headers()
-        self.wfile.write(bytes(content, &quot;utf-8&quot;))
-        return
-    
-    def home(self):
-        return &quot;Welcome User!&quot; if self.user else &quot;Welcome Stranger!&quot;
-
-    def login(self):
-        # Password would normally be checked here
-        sid = self.generate_sid()
-        self.cookie = &quot;sid={}&quot;.format(sid)
-        sessions[sid] = {&quot;username&quot;, &quot;useragent&quot;,&quot;ip address&quot;,&quot;expiry&quot;}
-        return &quot;Logged In&quot;
-
-    def logout(self):
-        if not self.user:
-            return &quot;Can&#39;t Log Out: No User Logged In&quot;
-        self.cookie = &quot;sid=&quot;
-        del sessions[self.user]
-        return &quot;Logged Out&quot;
-
-    def generate_sid(self):
-        return &quot;&quot;.join(str(randint(1,9)) for _ in range(100))
-
-    def parse_cookies(self, cookie_list):
-        return dict(((c.split(&quot;=&quot;)) for c in cookie_list.split(&quot;;&quot;))) \
-        if cookie_list else {}
-
-address = (&#39;&#39;, 8000)
-handler = SessionHandler
-server = HTTPServer(address, handler)
-
-server.serve_forever()
-</code></pre>
-<p>Please read more about cookies, their expiration setting, and elements of session security before deploying anything like this. There are many more standard practices to consider; including encrypting the session id. Stay Safe!</p>
 
             ]]>
         </content>
