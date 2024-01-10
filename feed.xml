@@ -3,12 +3,149 @@
     <title>David Gorski&#x27;s Tech Blog</title>
     <link href="https://tech.davidgorski.ca/feed.xml" rel="self" />
     <link href="https://tech.davidgorski.ca" />
-    <updated>2024-01-09T22:07:09-05:00</updated>
+    <updated>2024-01-10T13:38:11-05:00</updated>
     <author>
         <name>David Gorski</name>
     </author>
     <id>https://tech.davidgorski.ca</id>
 
+    <entry>
+        <title>C++ Pattern: Deriving From std::variant</title>
+        <author>
+            <name>David Gorski</name>
+        </author>
+        <link href="https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant.html"/>
+        <id>https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant.html</id>
+
+        <updated>2024-01-10T13:38:11-05:00</updated>
+            <summary></summary>
+        <content type="html">
+            <![CDATA[
+                <p>I am a big fan of sum types for expressive programming. They provide an elegant way to encode mutually exclusive data types in a single field. While not provided by the language itself, the C++ standard library offers us <code>std::variant</code>. Since there is no language-level pattern matching construct, interacting with variants can be less than ergonomic. One way to mitigate this is inheriting from <code>std::variant</code> and creating useful domain-specific access methods. This article discusses a few different ways of deriving from <code>std::variant</code> that might be useful and/or interesting.</p>
+<h2 id="a-result-type">A Result Type</h2>
+<p>To start off we’ll create a ~15 line class derived from <code>std::variant</code> that fulfills the basics of a result type (something like C++23 <code>std::expected</code> but available in C++17 and above). This is a nice way to encapsulate success and failures types in a united interface. Implementation:</p>
+<pre><code class="language-c++">#include &lt;variant&gt;
+
+template&lt;typename T, typename Error&gt;
+class Result : public std::variant&lt;T, Error&gt; {
+public:
+  using std::variant&lt;T, Error&gt;::variant;
+  using std::variant&lt;T, Error&gt;::operator=;
+  
+    Error* error() { return std::get_if&lt;Error&gt;(this); }
+    const Error* error() const { return std::get_if&lt;Error&gt;(this); }
+    T* value() { return std::get_if&lt;T&gt;(this); }
+    const T* value() const { return std::get_if&lt;T&gt;(this); }
+    T* operator-&gt;() { return value(); }
+    const T* operator-&gt;() const { return value(); }
+    operator bool() const { return error() == nullptr; }
+};
+</code></pre>
+<p>We derive from <code>std::variant</code> to take advantage of the ergonomic constructors and assignment operators (meaning we don’t have to implement them for each type and each reference type; doing this correctly is tedious). After this, we add two convenient methods to access the underlying types (along with const overloads). And finally, define <code>operator-&gt;</code> to allow access to the underlying success type value and <code>operator bool</code> to determine whether it holds the success type (along with const overloads).</p>
+<p>To demonstrate basic usage we can create a small type hierarchy with success and failure types:</p>
+<pre><code class="language-c++">struct SuccessResult {
+  int date;
+  double time;
+};
+struct ErrorResult {
+  std::string message;
+};
+using ProcessResult = Result&lt;SuccessResult, ErrorResult&gt;;
+</code></pre>
+<p>Then we create a function to demonstate it’s usage:</p>
+<pre><code>ProcessResult process(std::string_view input) {
+  return ErrorResult{ &quot;Not implemented&quot; };
+}
+</code></pre>
+<p>And finally we call the function and write some code that observes the return value:</p>
+<pre><code>const auto result = process(&quot;Hello&quot;);
+if (!result) {
+  std::cout &lt;&lt; &quot;Error: &quot; &lt;&lt; result.error()-&gt;message &lt;&lt; std::endl;
+} else {
+  std::cout &lt;&lt; &quot;Date: &quot; &lt;&lt; result-&gt;date &lt;&lt; &quot; Time: &quot; &lt;&lt; result-&gt;time &lt;&lt; std::endl;
+}
+</code></pre>
+<p>Overall, this approach is highly ergonomic, concise and clear. The call site is easily understood since <code>operator bool</code> cleanly checks the status, <code>operator -&gt;</code> eliminates unnecessary intermediate variables and method calls. The <code>error()</code> access method is also self-explanatory.</p>
+<h2 id="data-or-pointer-to-data">Data Or Pointer to Data</h2>
+<p>Another potentially useful class we can build is <code>DataOrPointer</code>. This is a class that either holds a type or a pointer to that type. Again we provide ergonomic access methods and operators:</p>
+<pre><code class="language-c++">template&lt;typename T&gt;
+class DataOrPointer : public std::variant&lt;T, T*&gt; {
+public:
+  using std::variant&lt;T, T*&gt;::variant;
+  using std::variant&lt;T, T*&gt;::operator=;
+  operator const T&amp;() const {
+    if (auto value = std::get_if&lt;T&gt;(this); value) {
+      return *value;
+    }
+    return *std::get&lt;T*&gt;(*this);
+  }
+};
+</code></pre>
+<p>You can use this if you want to provide a single return type to a function that takes a <code>T</code> as an argument and may or may not return a newly constructed <code>T</code> object after testing some conditions. If constructing <code>T</code> is expensive, this approach can be a clean way to achieve the objective. An real-world example of this could be normalizing two BigFloats to use the same exponent before operating on them. If the target exponent is equal to the current exponent, it would be a waste to build a new copy (In this case we can’t mutate the original numbers).</p>
+<pre><code>DataOrPointer&lt;const UnsignedBigFloat&gt; usingExponent(const UnsignedBigFloat&amp; value, int64_t exponent)  {
+    if (exponent == value._exponent) {
+        return DataOrPointer&lt;const UnsignedBigFloat&gt;(&amp;value);
+     }
+
+    auto copy = value;
+    copy._mantissa.timesTenToThe(exponent - value._exponent);
+    copy._exponent = exponent;
+    return std::move(copy);
+}
+</code></pre>
+<h2 id="multi-type-reference">Multi-Type Reference</h2>
+<p>I will admit the following example is almost too esoteric to be useful, but I have actually reached for this once before.</p>
+<p>The challenge: create a reference that can bind to one of multiple types, performance not being critical and reducing code duplication being the main objective.</p>
+<p>Solution:</p>
+<pre><code class="language-c++">template&lt;typename... Ts&gt;
+class MultiTypeReference : public std::variant&lt;Ts*...&gt; {
+public:
+  using std::variant&lt;Ts*...&gt;::variant;
+
+  template&lt;typename T&gt;
+  auto&amp; operator=(T value) {
+    std::visit([&amp;](auto&amp; pointer) { *pointer = value; }, *this);
+    return *this;
+  }
+
+  template&lt;typename T&gt;
+  operator T() {
+    return std::visit([&amp;](auto&amp; pointer) { return T(*pointer); }, *this);
+  }
+</code></pre>
+<p>Yes, this works. Yes, it’s weird. No, I don’t encourage you to use it. However, it is an interesting case study and hopefully gets you thinking about how to stretch the use of <code>std::variant</code>. Here’s how one would actually use it:</p>
+<pre><code>struct Data {
+   bool useFieldA;
+   int32_t A;
+     int64_t B;
+};
+
+MultiTypeReference&lt;int32_t, int64_t&gt; getRelevantField(Data&amp; data) {
+    return data.useFieldA ?
+          MultiTypeReference&lt;int32_t, int64_t&gt;(data.A) :
+          MultiTypeReference&lt;int32_t, int64_t&gt;(data.B);
+}
+
+void assignOne(Data&amp; one) {
+  getRelevantField(one) = 1;
+}
+</code></pre>
+<p>At the end of the day, yes, this simply hides the conditional access and assignment behind some abstractions. But in use, it behaves exactly how we want it: a reference to one of multiple types.</p>
+<h2 id="epilogue">Epilogue</h2>
+<p>The reason I included the word ‘Pattern’ in the title is because these ideas can be extended to theoretically endless types and custom access methods.</p>
+<p>For examples, you could build a result type with three different possible types and provide access methods for them (removing <code>operator-&gt;</code>). Or perhaps you provide a <code>transform</code> method that takes a functor and changes the value to hold a different type after transforming the current type. Or even just provide custom comparison operators (Which could be necessary for sorting different numeric types; imagine you want to sort a vector of regular int and BigInt references stored within a variant-type).</p>
+<p>In review, the key tools to leverage are:</p>
+<ol>
+<li>Using the constructors and assignment operators provided by <code>std::variant</code>.</li>
+<li>Defining named access methods for different types.</li>
+<li>Providing an <code>operator-&gt;</code> for a success or special type.</li>
+<li>Providing conversion operators for syntax-less unpacking.</li>
+</ol>
+<p>I hope my discussion of these concepts was useful or at least interesting. Thanks for reading! Subscribe via RSS or <a href="https://www.linkedin.com/in/dgski/">LinkedIn</a>.</p>
+
+            ]]>
+        </content>
+    </entry>
     <entry>
         <title>C++ Iterator-Friendly Branchless Binary Search</title>
         <author>
@@ -170,143 +307,6 @@ branchlessTime = 23558000
 stdTime        = 15002000
 </code></pre>
 <p>As you can see the benefits start to deteriorate as the array size grows.</p>
-
-            ]]>
-        </content>
-    </entry>
-    <entry>
-        <title>C++ Pattern: Deriving From std::variant</title>
-        <author>
-            <name>David Gorski</name>
-        </author>
-        <link href="https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant.html"/>
-        <id>https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant.html</id>
-
-        <updated>2024-01-09T22:07:09-05:00</updated>
-            <summary></summary>
-        <content type="html">
-            <![CDATA[
-                <p>I am a big fan of sum types for expressive programming. They provide an elegant way to encode mutually exclusive data types in a single field. While not provided by the language itself, the C++ standard library offers us <code>std::variant</code>. Since there is no language-level pattern matching construct, interacting with variants can be less than ergonomic. One way to mitigate this is inheriting from <code>std::variant</code> and creating useful domain-specific access methods. This article discusses a few different ways of deriving from <code>std::variant</code> that might be useful and/or interesting.</p>
-<h2 id="a-result-type">A Result Type</h2>
-<p>To start off we’ll create a ~15 line class derived from <code>std::variant</code> that fulfills the basics of a result type (something like C++23 <code>std::expected</code> but available in C++17 and above). This is a nice way to encapsulate success and failures types in a united interface. Implementation:</p>
-<pre><code class="language-c++">#include &lt;variant&gt;
-
-template&lt;typename T, typename Error&gt;
-class Result : public std::variant&lt;T, Error&gt; {
-public:
-  using std::variant&lt;T, Error&gt;::variant;
-  using std::variant&lt;T, Error&gt;::operator=;
-  
-    Error* error() { return std::get_if&lt;Error&gt;(this); }
-    const Error* error() const { return std::get_if&lt;Error&gt;(this); }
-    T* value() { return std::get_if&lt;T&gt;(this); }
-    const T* value() const { return std::get_if&lt;T&gt;(this); }
-    T* operator-&gt;() { return value(); }
-    const T* operator-&gt;() const { return value(); }
-    operator bool() const { return error() == nullptr; }
-};
-</code></pre>
-<p>We derive from <code>std::variant</code> to take advantage of the ergonomic constructors and assignment operators (meaning we don’t have to implement them for each type and each reference type; doing this correctly is tedious). After this, we add two convenient methods to access the underlying types (along with const overloads). And finally, define <code>operator-&gt;</code> to allow access to the underlying success type value and <code>operator bool</code> to determine whether it holds the success type (along with const overloads).</p>
-<p>To demonstrate basic usage we can create a small type hierarchy with success and failure types:</p>
-<pre><code class="language-c++">struct SuccessResult {
-  int date;
-  double time;
-};
-struct ErrorResult {
-  std::string message;
-};
-using ProcessResult = Result&lt;SuccessResult, ErrorResult&gt;;
-</code></pre>
-<p>Then we create a function to demonstate it’s usage:</p>
-<pre><code>ProcessResult process(std::string_view input) {
-  return ErrorResult{ &quot;Not implemented&quot; };
-}
-</code></pre>
-<p>And finally we call the function and write some code that observes the return value:</p>
-<pre><code>const auto result = process(&quot;Hello&quot;);
-if (!result) {
-  std::cout &lt;&lt; &quot;Error: &quot; &lt;&lt; result.error()-&gt;message &lt;&lt; std::endl;
-} else {
-  std::cout &lt;&lt; &quot;Date: &quot; &lt;&lt; result-&gt;date &lt;&lt; &quot; Time: &quot; &lt;&lt; result-&gt;time &lt;&lt; std::endl;
-}
-</code></pre>
-<p>Overall, this approach is highly ergonomic, concise and clear. The call site is easily understood since <code>operator bool</code> cleanly checks the status, <code>operator -&gt;</code> eliminates unnecessary intermediate variables and method calls. The <code>error()</code> access method is also self-explanatory.</p>
-<h2 id="data-or-pointer-to-data">Data Or Pointer to Data</h2>
-<p>Another potentially useful class we can build is <code>DataOrPointer</code>. This is a class that either holds a type or a pointer to that type. Again we provide ergonomic access methods and operators:</p>
-<pre><code class="language-c++">template&lt;typename T&gt;
-class DataOrPointer : public std::variant&lt;T, T*&gt; {
-public:
-  using std::variant&lt;T, T*&gt;::variant;
-  using std::variant&lt;T, T*&gt;::operator=;
-  operator const T&amp;() const {
-    if (auto value = std::get_if&lt;T&gt;(this); value) {
-      return *value;
-    }
-    return *std::get&lt;T*&gt;(*this);
-  }
-};
-</code></pre>
-<p>You can use this if you want to provide a single return type to a function that takes a <code>T</code> as an argument and may or may not return a newly constructed <code>T</code> object after testing some conditions. If constructing <code>T</code> is expensive, this approach can be a clean way to achieve the objective. An real-world example of this could be normalizing two BigFloats to use the same exponent before operating on them. If the target exponent is equal to the current exponent, it would be a waste to build a new copy (In this case we can’t mutate the original numbers).</p>
-<pre><code>DataOrPointer&lt;const UnsignedBigFloat&gt; usingExponent(const UnsignedBigFloat&amp; value, int64_t exponent)  {
-    if (exponent == value._exponent) {
-        return DataOrPointer&lt;const UnsignedBigFloat&gt;(&amp;value);
-     }
-
-    auto copy = value;
-    copy._mantissa.timesTenToThe(exponent - value._exponent);
-    copy._exponent = exponent;
-    return std::move(copy);
-}
-</code></pre>
-<h2 id="multi-type-reference">Multi-Type Reference</h2>
-<p>I will admit the following example is almost too esoteric to be useful, but I have actually reached for this once before.</p>
-<p>The challenge: create a reference that can bind to one of multiple types, performance not being critical and reducing code duplication being the main objective.</p>
-<p>Solution:</p>
-<pre><code class="language-c++">template&lt;typename... Ts&gt;
-class MultiTypeReference : public std::variant&lt;Ts*...&gt; {
-public:
-  using std::variant&lt;Ts*...&gt;::variant;
-
-  template&lt;typename T&gt;
-  auto&amp; operator=(T value) {
-    std::visit([&amp;](auto&amp; pointer) { *pointer = value; }, *this);
-    return *this;
-  }
-
-  template&lt;typename T&gt;
-  operator T() {
-    return std::visit([&amp;](auto&amp; pointer) { return T(*pointer); }, *this);
-  }
-</code></pre>
-<p>Yes, this works. Yes, it’s weird. No, I don’t encourage you to use it. However, it is an interesting case study and hopefully gets you thinking about how to stretch the use of <code>std::variant</code>. Here’s how one would actually use it:</p>
-<pre><code>struct Data {
-   bool useFieldA;
-   int32_t A;
-     int64_t B;
-};
-
-MultiTypeReference&lt;int32_t, int64_t&gt; getRelevantField(Data&amp; data) {
-    return data.useFieldA ?
-          MultiTypeReference&lt;int32_t, int64_t&gt;(data.A) :
-          MultiTypeReference&lt;int32_t, int64_t&gt;(data.B);
-}
-
-void assignOne(Data&amp; one) {
-  getRelevantField(one) = 1;
-}
-</code></pre>
-<p>At the end of the day, yes, this simply hides the conditional access and assignment behind some abstractions. But in use, it behaves exactly how we want it: a reference to one of multiple types.</p>
-<h2 id="epilogue">Epilogue</h2>
-<p>The reason I included the word ‘Pattern’ in the title is because these ideas can be extended to theoretically endless types and custom access methods.</p>
-<p>For examples, you could build a result type with three different possible types and provide access methods for them (removing <code>operator-&gt;</code>). Or perhaps you provide a <code>transform</code> method that takes a functor and changes the value to hold a different type after transforming the current type. Or even just provide custom comparison operators (Which could be necessary for sorting different numeric types; imagine you want to sort a vector of regular int and BigInt references stored within a variant-type).</p>
-<p>In review, the key tools to leverage are:</p>
-<ol>
-<li>Using the constructors and assignment operators provided by <code>std::variant</code>.</li>
-<li>Defining named access methods for different types.</li>
-<li>Providing an <code>operator-&gt;</code> for a success or special type.</li>
-<li>Providing conversion operators for syntax-less unpacking.</li>
-</ol>
-<p>I hope my discussion of these concepts was useful or at least interesting. Thanks for reading! Subscribe via RSS or <a href="https://www.linkedin.com/in/dgski/">LinkedIn</a>.</p>
 
             ]]>
         </content>
