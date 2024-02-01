@@ -3,7 +3,7 @@
     <title>David Gorski&#x27;s Tech Blog</title>
     <link href="https://tech.davidgorski.ca/feed.xml" rel="self" />
     <link href="https://tech.davidgorski.ca" />
-    <updated>2024-01-10T13:38:11-05:00</updated>
+    <updated>2024-01-31T20:59:35-05:00</updated>
     <author>
         <name>David Gorski</name>
     </author>
@@ -17,7 +17,7 @@
         <link href="https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant.html"/>
         <id>https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant.html</id>
 
-        <updated>2024-01-10T13:38:11-05:00</updated>
+        <updated>2024-01-31T20:59:35-05:00</updated>
             <summary></summary>
         <content type="html">
             <![CDATA[
@@ -81,7 +81,7 @@ public:
   }
 };
 </code></pre>
-<p>You can use this if you want to provide a single return type to a function that takes a <code>T</code> as an argument and may or may not return a newly constructed <code>T</code> object after testing some conditions. If constructing <code>T</code> is expensive, this approach can be a clean way to achieve the objective. An real-world example of this could be normalizing two BigFloats to use the same exponent before operating on them. If the target exponent is equal to the current exponent, it would be a waste to build a new copy (In this case we can’t mutate the original numbers).</p>
+<p>You can use this if you want to provide a single return type to a function that takes a <code>T</code> as an argument and may or may not return a newly constructed <code>T</code> object after testing some conditions. If constructing <code>T</code> is expensive, this approach can be a clean way to achieve the objective. A real-world example of this could be normalizing two BigFloats to use the same exponent before operating on them. If the target exponent is equal to the current exponent, it would be a waste to build a new copy (In this case we can’t mutate the original numbers).</p>
 <pre><code>DataOrPointer&lt;const UnsignedBigFloat&gt; usingExponent(const UnsignedBigFloat&amp; value, int64_t exponent)  {
     if (exponent == value._exponent) {
         return DataOrPointer&lt;const UnsignedBigFloat&gt;(&amp;value);
