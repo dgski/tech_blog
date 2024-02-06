@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-    <title>David Gorski&#x27;s Tech Blog</title>
+    <title>Tech @ David</title>
     <link href="https://tech.davidgorski.ca/feed.xml" rel="self" />
     <link href="https://tech.davidgorski.ca" />
-    <updated>2024-01-31T20:59:35-05:00</updated>
+    <updated>2024-01-31T17:59:35-08:00</updated>
     <author>
         <name>David Gorski</name>
     </author>
@@ -17,8 +17,12 @@
         <link href="https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant.html"/>
         <id>https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant.html</id>
 
-        <updated>2024-01-31T20:59:35-05:00</updated>
-            <summary></summary>
+        <updated>2024-01-31T17:59:35-08:00</updated>
+            <summary>
+                <![CDATA[
+                    I am a big fan of sum types for expressive programming. They&hellip;
+                ]]>
+            </summary>
         <content type="html">
             <![CDATA[
                 <p>I am a big fan of sum types for expressive programming. They provide an elegant way to encode mutually exclusive data types in a single field. While not provided by the language itself, the C++ standard library offers us <code>std::variant</code>. Since there is no language-level pattern matching construct, interacting with variants can be less than ergonomic. One way to mitigate this is inheriting from <code>std::variant</code> and creating useful domain-specific access methods. This article discusses a few different ways of deriving from <code>std::variant</code> that might be useful and/or interesting.</p>
@@ -154,8 +158,12 @@ void assignOne(Data&amp; one) {
         <link href="https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search.html"/>
         <id>https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search.html</id>
 
-        <updated>2023-12-18T09:36:35-05:00</updated>
-            <summary></summary>
+        <updated>2023-12-18T06:36:35-08:00</updated>
+            <summary>
+                <![CDATA[
+                    Once you delve into the realm of low-latency C++, you will find&hellip;
+                ]]>
+            </summary>
         <content type="html">
             <![CDATA[
                 <p>Once you delve into the realm of low-latency C++, you will find yourself waking up in the middle of the night, sweating profusely from a nightmare concerning unnecessary branching. And soon after, you begin to over-optimize your code to avoid branches. Even when that part of your code is clearly not the bottleneck.</p>
@@ -322,8 +330,12 @@ stdTime        = 15002000
             <category term="Programming"/>
             <category term="C++"/>
 
-        <updated>2023-07-29T14:33:32-04:00</updated>
-            <summary></summary>
+        <updated>2023-07-29T11:33:32-07:00</updated>
+            <summary>
+                <![CDATA[
+                    One problem that arises when interleaving SQL queries in C++ code is&hellip;
+                ]]>
+            </summary>
         <content type="html">
             <![CDATA[
                 <p>One problem that arises when interleaving SQL queries in C++ code is string literal formatting and spacing. Most queries are much more human-digestible in a multi-line format. C++ treats adjacent string literals as one, so the traditional C++ solution is this:</p>
@@ -514,8 +526,12 @@ constexpr auto trucatedQuery = truncateWhitespace&lt;slimmedSize&gt;(originalQue
             <category term="Types"/>
             <category term="C++"/>
 
-        <updated>2023-07-29T14:30:57-04:00</updated>
-            <summary></summary>
+        <updated>2023-07-29T11:30:57-07:00</updated>
+            <summary>
+                <![CDATA[
+                    This article presents a simple way to cleanly define nested, multi-branch type&hellip;
+                ]]>
+            </summary>
         <content type="html">
             <![CDATA[
                 <p>This article presents a simple way to cleanly define nested, multi-branch type hierarchies using C++17. An endeavour which was much messier in older versions of C++. This can be altered and modified to generated pure schemas, new data types, and anything tree based. It leverages <a href="https://en.cppreference.com/w/cpp/utility/variant">std::variant</a> to cleanly express a cohesive approach to designing easily composed data structures.</p>
@@ -678,8 +694,12 @@ auto root3 =
             <category term="Linux"/>
             <category term="Backup"/>
 
-        <updated>2023-07-29T14:29:47-04:00</updated>
-            <summary></summary>
+        <updated>2023-07-29T11:29:47-07:00</updated>
+            <summary>
+                <![CDATA[
+                    Until recently, my only computer was a 2013 MacBook Air. I backed&hellip;
+                ]]>
+            </summary>
         <content type="html">
             <![CDATA[
                 <p>Until recently, my only computer was a 2013 MacBook Air. I backed it up using the included Time Machine system and an external spinning disk hard drive. With the nature of it being a laptop, I didn’t have the external drive plugged in all the time, and so I set a calendar reminder to do a weekly backup because I knew I wouldn’t do it daily. It’s embarrassing to admit that even as a ‘tech professional’, there were plenty of weeks that I skipped backing up my content. I was used to the computer working all the time, I was busy and I always had some excuse to ignore the reminders. MacOS Notifications would beg me to do something:</p>
@@ -754,8 +774,12 @@ echo &quot;personal backup complete ($(date))&quot; &gt;&gt; {{LOG_FILE}}
             <category term="Functional Programming"/>
             <category term="C++"/>
 
-        <updated>2023-07-29T14:28:24-04:00</updated>
-            <summary></summary>
+        <updated>2023-07-29T11:28:24-07:00</updated>
+            <summary>
+                <![CDATA[
+                    A popular idiom in functional programming is the use of sum types&hellip;
+                ]]>
+            </summary>
         <content type="html">
             <![CDATA[
                 <p>A popular idiom in <strong>functional programming</strong> is the use of <a href="https://en.wikipedia.org/wiki/Algebraic_data_type">sum types</a> to express results or optional values. When a function returns, it either succeeded and we get the result, or it failed and we have an error on our hands. This is a pattern in Modern C++ as well, enabled by standard library types such as <a href="https://en.cppreference.com/w/cpp/utility/variant">std::variant</a> and <a href="https://en.cppreference.com/w/cpp/utility/optional">std::optional</a>. In this article we will explore how to improve the ergonomics of handling multiple results and potential error values.</p>
@@ -893,8 +917,12 @@ auto [val1, val2, val3] = get_ok(aggregate_res);
             <category term="Project"/>
             <category term="Programming"/>
 
-        <updated>2023-07-29T14:29:15-04:00</updated>
-            <summary></summary>
+        <updated>2023-07-29T11:29:15-07:00</updated>
+            <summary>
+                <![CDATA[
+                    Last month, I finally launched my collaborative map-based urban planning web application:&hellip;
+                ]]>
+            </summary>
         <content type="html">
             <![CDATA[
                 <p>Last month, I finally launched my collaborative map-based urban planning web application: <a href="https://plantogether.city">Plan Together</a>. It was a lot of work, but I must say I am proud of the result; it is my most feature-complete project to date. It’s quite an experience having to do 100% of the work for product development, system architecture design, programming, and user interface/experience design. It definitely increases one’s respect for the work of their co-workers in different departments. I highly recommend it.</p>
@@ -925,8 +953,12 @@ auto [val1, val2, val3] = get_ok(aggregate_res);
             <category term="backend"/>
             <category term="Architecture"/>
 
-        <updated>2023-07-29T14:25:31-04:00</updated>
-            <summary></summary>
+        <updated>2023-07-29T11:25:31-07:00</updated>
+            <summary>
+                <![CDATA[
+                    Know your Data It is most important for a back-end developer to&hellip;
+                ]]>
+            </summary>
         <content type="html">
             <![CDATA[
                 <h2 id="know-your-data">Know your Data</h2>
@@ -978,8 +1010,12 @@ auto [val1, val2, val3] = get_ok(aggregate_res);
             <category term="Scheme"/>
             <category term="Functional Programming"/>
 
-        <updated>2023-07-29T14:27:41-04:00</updated>
-            <summary></summary>
+        <updated>2023-07-29T11:27:41-07:00</updated>
+            <summary>
+                <![CDATA[
+                    The goal of this article is to explain the purpose and functionality&hellip;
+                ]]>
+            </summary>
         <content type="html">
             <![CDATA[
                 <p>The goal of this article is to explain the purpose and functionality of <strong>fixed-point combinator functions</strong>. I had a hard time following along with other articles on this topic so I wrote this as a learning exercise. We’ll be using the <strong>Scheme</strong> language.</p>
@@ -1101,8 +1137,12 @@ It will consume a function (f) and return the factorial function, replacing <str
             <category term="C++"/>
             <category term="Abtractions"/>
 
-        <updated>2023-07-29T14:32:44-04:00</updated>
-            <summary></summary>
+        <updated>2023-07-29T11:32:44-07:00</updated>
+            <summary>
+                <![CDATA[
+                    What is an Iterator? The Iterator is the abstraction at the heart&hellip;
+                ]]>
+            </summary>
         <content type="html">
             <![CDATA[
                 <h2 id="what-is-an-iterator">What is an Iterator?</h2>
