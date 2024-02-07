@@ -14,8 +14,8 @@
         <author>
             <name>David Gorski</name>
         </author>
-        <link href="https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant.html"/>
-        <id>https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant.html</id>
+        <link href="https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant/"/>
+        <id>https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant/</id>
 
         <updated>2024-01-31T17:59:35-08:00</updated>
             <summary>
@@ -155,8 +155,8 @@ void assignOne(Data&amp; one) {
         <author>
             <name>David Gorski</name>
         </author>
-        <link href="https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search.html"/>
-        <id>https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search.html</id>
+        <link href="https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search/"/>
+        <id>https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search/</id>
 
         <updated>2023-12-18T06:36:35-08:00</updated>
             <summary>
@@ -324,8 +324,8 @@ stdTime        = 15002000
         <author>
             <name>David Gorski</name>
         </author>
-        <link href="https://tech.davidgorski.ca/truncating-string-white-space-at-compile-time-in-c.html"/>
-        <id>https://tech.davidgorski.ca/truncating-string-white-space-at-compile-time-in-c.html</id>
+        <link href="https://tech.davidgorski.ca/truncating-string-white-space-at-compile-time-in-c/"/>
+        <id>https://tech.davidgorski.ca/truncating-string-white-space-at-compile-time-in-c/</id>
             <category term="constexpr"/>
             <category term="Programming"/>
             <category term="C++"/>
@@ -521,8 +521,8 @@ constexpr auto trucatedQuery = truncateWhitespace&lt;slimmedSize&gt;(originalQue
         <author>
             <name>David Gorski</name>
         </author>
-        <link href="https://tech.davidgorski.ca/using-c17-to-create-composable-recursive-data-types.html"/>
-        <id>https://tech.davidgorski.ca/using-c17-to-create-composable-recursive-data-types.html</id>
+        <link href="https://tech.davidgorski.ca/using-c17-to-create-composable-recursive-data-types/"/>
+        <id>https://tech.davidgorski.ca/using-c17-to-create-composable-recursive-data-types/</id>
             <category term="Types"/>
             <category term="C++"/>
 
@@ -689,8 +689,8 @@ auto root3 =
         <author>
             <name>David Gorski</name>
         </author>
-        <link href="https://tech.davidgorski.ca/a-simple-personal-data-backup-setup-2.html"/>
-        <id>https://tech.davidgorski.ca/a-simple-personal-data-backup-setup-2.html</id>
+        <link href="https://tech.davidgorski.ca/a-simple-personal-data-backup-setup-2/"/>
+        <id>https://tech.davidgorski.ca/a-simple-personal-data-backup-setup-2/</id>
             <category term="Linux"/>
             <category term="Backup"/>
 
@@ -769,8 +769,8 @@ echo &quot;personal backup complete ($(date))&quot; &gt;&gt; {{LOG_FILE}}
         <author>
             <name>David Gorski</name>
         </author>
-        <link href="https://tech.davidgorski.ca/concise-result-extraction-in-modern-c.html"/>
-        <id>https://tech.davidgorski.ca/concise-result-extraction-in-modern-c.html</id>
+        <link href="https://tech.davidgorski.ca/concise-result-extraction-in-modern-c/"/>
+        <id>https://tech.davidgorski.ca/concise-result-extraction-in-modern-c/</id>
             <category term="Functional Programming"/>
             <category term="C++"/>
 
@@ -911,8 +911,8 @@ auto [val1, val2, val3] = get_ok(aggregate_res);
         <author>
             <name>David Gorski</name>
         </author>
-        <link href="https://tech.davidgorski.ca/five-web-project-lessons.html"/>
-        <id>https://tech.davidgorski.ca/five-web-project-lessons.html</id>
+        <link href="https://tech.davidgorski.ca/five-web-project-lessons/"/>
+        <id>https://tech.davidgorski.ca/five-web-project-lessons/</id>
             <category term="Webapp"/>
             <category term="Project"/>
             <category term="Programming"/>
@@ -947,8 +947,8 @@ auto [val1, val2, val3] = get_ok(aggregate_res);
         <author>
             <name>David Gorski</name>
         </author>
-        <link href="https://tech.davidgorski.ca/back-end-development-basics.html"/>
-        <id>https://tech.davidgorski.ca/back-end-development-basics.html</id>
+        <link href="https://tech.davidgorski.ca/back-end-development-basics/"/>
+        <id>https://tech.davidgorski.ca/back-end-development-basics/</id>
             <category term="data"/>
             <category term="backend"/>
             <category term="Architecture"/>
@@ -1005,8 +1005,8 @@ auto [val1, val2, val3] = get_ok(aggregate_res);
         <author>
             <name>David Gorski</name>
         </author>
-        <link href="https://tech.davidgorski.ca/the-fixed-point-combinator-function.html"/>
-        <id>https://tech.davidgorski.ca/the-fixed-point-combinator-function.html</id>
+        <link href="https://tech.davidgorski.ca/the-fixed-point-combinator-function/"/>
+        <id>https://tech.davidgorski.ca/the-fixed-point-combinator-function/</id>
             <category term="Scheme"/>
             <category term="Functional Programming"/>
 
@@ -1131,8 +1131,8 @@ It will consume a function (f) and return the factorial function, replacing <str
         <author>
             <name>David Gorski</name>
         </author>
-        <link href="https://tech.davidgorski.ca/custom-stl-compatible-iterators.html"/>
-        <id>https://tech.davidgorski.ca/custom-stl-compatible-iterators.html</id>
+        <link href="https://tech.davidgorski.ca/custom-stl-compatible-iterators/"/>
+        <id>https://tech.davidgorski.ca/custom-stl-compatible-iterators/</id>
             <category term="Iterators"/>
             <category term="C++"/>
             <category term="Abtractions"/>
