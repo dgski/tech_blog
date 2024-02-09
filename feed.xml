@@ -3,12 +3,47 @@
     <title>Tech @ DG</title>
     <link href="https://tech.davidgorski.ca/feed.xml" rel="self" />
     <link href="https://tech.davidgorski.ca" />
-    <updated>2024-01-31T17:59:35-08:00</updated>
+    <updated>2024-02-09T13:41:04-08:00</updated>
     <author>
         <name>David Gorski</name>
     </author>
     <id>https://tech.davidgorski.ca</id>
 
+    <entry>
+        <title>Literary Programming</title>
+        <author>
+            <name>David Gorski</name>
+        </author>
+        <link href="https://tech.davidgorski.ca/literary-programming/"/>
+        <id>https://tech.davidgorski.ca/literary-programming/</id>
+            <category term="style"/>
+            <category term="Programming"/>
+
+        <updated>2024-02-09T13:41:04-08:00</updated>
+            <summary>
+                <![CDATA[
+                    Code is written once, but read many times. Given this truth, it&hellip;
+                ]]>
+            </summary>
+        <content type="html">
+            <![CDATA[
+                <p>Code is written once, but read many times. Given this truth, it makes sense to prioritize read-ability over write-ability. Readable code contains good variable names, uses appropriate abstractions and is understood easily. Many have waved the flag of ‘Clean Code’ for quite a few decades now.</p>
+<p>What has helped me write code that I consider clear and readable is something I call <em>Literary Programming</em>. Not to be confused with <a href="https://en.wikipedia.org/wiki/Literate_programming">Literate Programming</a>. I would change the name of my concept but I’m too stubborn. Apologies in advance.</p>
+<p>What I call <em>Literary Programming</em> is the deliberate application of structured grammar and story-telling into the naming, abstracting and composition of code. It is the conscious act of letting your code capture a narrative with your choice of words. Not leaving intentions and actions in a state of vagueness; method names should reflect what is actually being done within and the meaning of the return value, intermediate variables are encouraged.</p>
+<p>Don’t overanalyze what I am trying to say. This isn’t a very strict set of rules. It may just be synonymous with ‘Good Code’ to you. It is a simple idea meant to inspire a little more scrutiny in you when creating APIs, choosing names, composing expressions and designing the structure of your application.</p>
+<p>Here are just some ways you can make your more <strong>literary</strong>:</p>
+<ul>
+<li>Use abstractions to ‘shorten’ portions of code. Simple example: putting argument and configuration parsing in a separate function to keep the rest of the <code>main</code> as clean as possible.</li>
+<li>Put great care into class API design; as much detail as possible into method names. Prefer a name like <strong>processIncomingMessages()</strong> over <strong>process()</strong> or <strong>messages()</strong>. <strong>getOrCreateItem()</strong> over <strong>getItem()</strong> or <strong>createItem()</strong> for a method that will return an existing object if it already exists.</li>
+<li>Value consistency. One method shouldn’t be named <strong>bool error()</strong> while it’s counterpart is named <strong>bool isValid()</strong>.</li>
+<li>Use intermediate variables to compose expressions. These variables serve as logic checkpoints for the future reader.</li>
+<li>Wrap complicated loop conditions into a boolean-returning functor. Take this call site as an example: <code>while (continueRunning(itemsLeft, maxItemsToProcess, error))</code>.</li>
+<li>As mentioned before; good naming pays dividends.</li>
+</ul>
+
+            ]]>
+        </content>
+    </entry>
     <entry>
         <title>C++ Pattern: Deriving From std::variant</title>
         <author>
@@ -1121,217 +1156,6 @@ It will consume a function (f) and return the factorial function, replacing <str
       (lambda (a)
         ((f ((lambda (y) (lambda (a) ((f (y y)) a)))
              (lambda (y) (lambda (a) ((f (y y)) a))))) a))))
-</code></pre>
-
-            ]]>
-        </content>
-    </entry>
-    <entry>
-        <title>Custom STL Compatible Iterators</title>
-        <author>
-            <name>David Gorski</name>
-        </author>
-        <link href="https://tech.davidgorski.ca/custom-stl-compatible-iterators/"/>
-        <id>https://tech.davidgorski.ca/custom-stl-compatible-iterators/</id>
-            <category term="Iterators"/>
-            <category term="C++"/>
-            <category term="Abtractions"/>
-
-        <updated>2023-07-29T11:32:44-07:00</updated>
-            <summary>
-                <![CDATA[
-                    What is an Iterator? The Iterator is the abstraction at the heart&hellip;
-                ]]>
-            </summary>
-        <content type="html">
-            <![CDATA[
-                <h2 id="what-is-an-iterator">What is an Iterator?</h2>
-<p>The <strong>Iterator</strong> is the abstraction at the heart of all Collection-related functionality within the C++ Standard Library. Most algorithms are defined in terms of iterators. What is an iterator exactly?</p>
-<p>Fundamentally, an Iterator represents a point of iteration. A point of iteration describes:</p>
-<ul>
-<li>How to retrieve the value at the point</li>
-<li>How the point of iteration can be incremented/decremented</li>
-<li>How to compare it with other points of iteration</li>
-</ul>
-<p>For example: Conceptually, if you are ‘iterating’ over a <strong>book’s pages</strong>, the point of iteration could describe the following rules:</p>
-<ul>
-<li>The value at the point of iteration can be retrieved by reading the current page.</li>
-<li>The point of iteration can be incremented by turning the page forward.</li>
-<li>You can compare the point of iteration with other points of iteration by looking at the page number.</li>
-</ul>
-<p><em>Take note how this book example does not describe how to ‘decrement’ the iteration. Philosophically speaking, using this description; you could only ever turn the pages forward, never back.</em></p>
-<p>In C++, iterators are defined as objects with methods describing their rules.</p>
-<h2 id="creating-a-custom-collection">Creating a Custom Collection</h2>
-<p>First, we are going to create a custom collection type compatible with <strong>STL algorithm constructs</strong> and <strong>ranged for-loops</strong>. At that level of abstraction all we need to provide is <strong>begin()</strong> and <strong>end()</strong> methods, and then we will be able to write code like this:</p>
-<pre><code class="language-c++">Collection col;
-
-for(auto&amp; c : col)
-    cout &lt;&lt; c &lt;&lt; endl;
-
-std::transform(begin(col), end(col), begin(col), [](auto&amp; i)
-{
-    return i * i;
-});
-</code></pre>
-<p>Our collection will be a simple wrapper class around a c-array. This is what <strong>std::array</strong> provides in the Standard Library. In reality, you will only write custom collections and iterators if you need very particular data structures satisfying very specific requirements. Here is our collection definition:</p>
-<pre><code class="language-c++">template&lt;class T, int N&gt;
-class Collection
-{
-    T data[N] = { 0 };
-public:
-    col_iterator&lt;T&gt; begin()
-    {
-        return col_iterator&lt;T&gt;(data);
-    }
-    col_iterator&lt;T&gt; end()
-    {
-        return col_iterator&lt;T&gt;(data + N);
-    }
-};
-</code></pre>
-<p>We take type and size as template arguments, create an array of that type and size. We also define methods which return the iterators to the beginning and end of the collection, passing the pointers to the first element (data) and just past the last element (data + N) as arguments.</p>
-<h2 id="the-iterator-itself">The Iterator Itself</h2>
-<p>Now that we have created a collection-type, we need to define the iterator for use with the <strong>begin()</strong> and <strong>end()</strong> methods. First, we declare our iterator class ahead of our collection class declaration (The class needs to be aware of the iterator’s existence), and then we define the iterator below the collection definition:</p>
-<pre><code class="language-c++">template &lt;class T&gt; class col_iterator; // Declaration
-
-// Collection class definition  here ...
-
-template &lt;class T&gt;
-class col_iterator // Definition
-{
-    // Iterator Definition Goes Here
-}
-</code></pre>
-<p>There a few things an iterator needs in order to be STL compatible. This also depends on the type of the iterator. The types of iterators are:</p>
-<ul>
-<li>Input Iterators</li>
-<li>Output Iterators</li>
-<li>Forward Iterator</li>
-<li>Bidirectional Iterators</li>
-<li>Random-Access Iterators</li>
-</ul>
-<p>Each of these have different requirements. For the sake of simplicity, we will be defining a <strong>Forward Iterator</strong> for our collection, which has less requirements. These are the requirements for <strong>Forward Iterators</strong>:</p>
-<ol>
-<li><strong>Iterator Characteristics</strong> - Five member type definitions which describe the iterator type and datatypes that iterator is related to.</li>
-<li><strong>Default Constructor</strong> -  Ability to construct the iterator with no arguments</li>
-<li>**Dereference Operator *** - to access the underlying data the iterator is “pointing” towards.</li>
-<li><strong>Not-Equal Operator !=</strong> - to know when iterators are not equal to one another</li>
-<li><strong>Pre-Increment Operator ++</strong> - to increment the iterator.</li>
-<li><strong>Post-Increment Operator ++</strong> - to create and return an incremented iterator.</li>
-</ol>
-<p>And that’s it! If these elements are present in a class it is a valid iterator that can be used with STL algorithms. These members must be publically accessible.</p>
-<p>Let’s define our iterator in code:</p>
-<pre><code class="language-c++">#include &lt;iterator&gt;
-
-template &lt;class T&gt;
-class col_iterator
-{
-    T* data;
-public:
-    using iterator_category = std::forward_iterator_tag;
-    using value_type = T;
-    using difference_type = size_t;
-    using pointer = T*;
-    using reference = T&amp;;
-
-    col_iterator(){}
-    col_iterator(pointer _data) : data(_data) {}
-
-    pointer data() { return data; }
-    reference operator*() { return *data; }
-    bool operator!=(const col_iterator&amp; other)
-    {
-        return data != other.data();
-    }
-    col_iterator&lt;T&gt;&amp; operator++()
-    {
-        data += 1;
-        return *this;
-    }
-    col_iterator&lt;T&gt; operator++(int)
-    {
-        return col_iterator&lt;T&gt;(data + 1);
-    }
-};
-</code></pre>
-<p>As you can see we have defined all the required elements of a <strong>Forward Iterator</strong>. One thing to note is the member <strong>iterator_category</strong>. It uses the <strong>std::forward_iterator_tag</strong> from the standard library marking this iterator as a <strong>Forward Iterator</strong>. These tags are available in <strong><iterator></strong>.</p>
-<p>Now our class should easily work with STL algorithms such as the following:</p>
-<pre><code class="language-c++">Collection&lt;int, 5&gt; test;
-std::fill(test.begin(), test.end(), 10);
-</code></pre>
-<p>To get more familiar with iterators:</p>
-<ul>
-<li>Add constant iterators to your collection ( define <strong>cend()</strong> and <strong>cbegin()</strong>).</li>
-<li>Read up on the different iterator types and their specific requirements.</li>
-<li>Implement different iterator types for your collection.</li>
-<li>Try creating a collection with a different underlying type. For example using a linked-list instead of c-array. The increment and decrement methods will be much different.</li>
-</ul>
-<h2 id="complete-code-example">Complete Code Example</h2>
-<pre><code class="language-c++">#include &lt;iterator&gt;
-#include &lt;iostream&gt;
-#include &lt;algorithm&gt;
-
-template &lt;class T&gt; class col_iterator;
-
-template&lt;class T, int N&gt;
-class Collection
-{
-    T data[N] = { 0 };
-public:
-    col_iterator&lt;T&gt; begin()
-    {
-        return col_iterator&lt;T&gt;(data);
-    }
-    col_iterator&lt;T&gt; end()
-    {
-        return col_iterator&lt;T&gt;(data + N);
-    }
-};
-
-template &lt;class T&gt;
-class col_iterator
-{
-public:
-    T* data;
-    using iterator_category = std::forward_iterator_tag;
-    using value_type = T;
-    using difference_type = size_t;
-    using pointer = T*;
-    using reference = T&amp;;
-
-    col_iterator(){}
-    col_iterator(pointer _data) : data(_data) {}
-
-    reference operator*() { return *data; }
-    bool operator!=(const col_iterator&amp; other)
-    {
-        return data != other.data;
-    }
-    col_iterator&lt;T&gt;&amp; operator++()
-    {
-        data += 1;
-        return *this;
-    }
-    col_iterator&lt;T&gt; operator++(int)
-    {
-        return col_iterator&lt;T&gt;(data + 1);
-    }
-};
-
-int main(void)
-{
-    Collection&lt;int,10&gt; test;
-
-    std::fill(test.begin(), test.end(), 2);
-
-    std::transform(test.begin(), test.end(), test.begin(), [](int i)
-    {
-        return i * i;
-    });
-
-    for(auto t : test)
-        std::cout &lt;&lt; t &lt;&lt; std::endl;
-}   
 </code></pre>
 
             ]]>
