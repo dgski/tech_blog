@@ -3,7 +3,7 @@
     <title>Tech @ DG</title>
     <link href="https://tech.davidgorski.ca/feed.xml" rel="self" />
     <link href="https://tech.davidgorski.ca" />
-    <updated>2024-02-09T13:43:41-08:00</updated>
+    <updated>2024-02-09T13:44:51-08:00</updated>
     <author>
         <name>David Gorski</name>
     </author>
@@ -19,7 +19,7 @@
             <category term="style"/>
             <category term="Programming"/>
 
-        <updated>2024-02-09T13:43:41-08:00</updated>
+        <updated>2024-02-09T13:44:51-08:00</updated>
             <summary>
                 <![CDATA[
                     Code is written once, but read many times. Given this truth, it&hellip;
@@ -28,7 +28,7 @@
         <content type="html">
             <![CDATA[
                 <p>Code is written once, but read many times. Given this truth, it makes sense to prioritize read-ability over write-ability. Readable code contains good variable names, uses appropriate abstractions and is understood easily. Many have waved the flag of ‘Clean Code’ for quite a few decades now.</p>
-<p>What has helped me write code that I consider clear and readable is something I call <em>Literary Programming</em>. Not to be confused with <a href="https://en.wikipedia.org/wiki/Literate_programming">Literate Programming</a>. I would change the name of my concept but I’ve grown rather fond of the name. Apologies in advance.</p>
+<p>What has helped me write code that I consider clear and readable is something I call <em>Literary Programming</em>. Not to be confused with <a href="https://en.wikipedia.org/wiki/Literate_programming">Literate Programming</a>. I would change the name of my concept but I’ve grown rather fond of it. Apologies in advance.</p>
 <p>What I call <em>Literary Programming</em> is the deliberate application of structured grammar and story-telling into the naming, abstracting and composition of code. It is the conscious act of letting your code capture a narrative with your choice of words. Not leaving intentions and actions in a state of vagueness; method names should reflect what is actually being done within and the meaning of the return value, intermediate variables are encouraged.</p>
 <p>Don’t overanalyze what I am trying to say. This isn’t a very strict set of rules. It may just be synonymous with ‘Good Code’ to you. It is a simple idea meant to inspire a little more scrutiny in you when creating APIs, choosing names, composing expressions and designing the structure of your application.</p>
 <p>Here are just some ways you can make your more <strong>literary</strong>:</p>
