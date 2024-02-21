@@ -3,7 +3,7 @@
     <title>Tech @ DG</title>
     <link href="https://tech.davidgorski.ca/feed.xml" rel="self" />
     <link href="https://tech.davidgorski.ca" />
-    <updated>2024-02-09T13:44:51-08:00</updated>
+    <updated>2024-02-09T16:44:51-05:00</updated>
     <author>
         <name>David Gorski</name>
     </author>
@@ -19,7 +19,7 @@
             <category term="style"/>
             <category term="Programming"/>
 
-        <updated>2024-02-09T13:44:51-08:00</updated>
+        <updated>2024-02-09T16:44:51-05:00</updated>
             <summary>
                 <![CDATA[
                     Code is written once, but read many times. Given this truth, it&hellip;
@@ -52,7 +52,7 @@
         <link href="https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant/"/>
         <id>https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant/</id>
 
-        <updated>2024-01-31T17:59:35-08:00</updated>
+        <updated>2024-01-31T20:59:35-05:00</updated>
             <summary>
                 <![CDATA[
                     I am a big fan of sum types for expressive programming. They&hellip;
@@ -193,7 +193,7 @@ void assignOne(Data&amp; one) {
         <link href="https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search/"/>
         <id>https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search/</id>
 
-        <updated>2023-12-18T06:36:35-08:00</updated>
+        <updated>2023-12-18T09:36:35-05:00</updated>
             <summary>
                 <![CDATA[
                     Once you delve into the realm of low-latency C++, you will find&hellip;
@@ -365,7 +365,7 @@ stdTime        = 15002000
             <category term="Programming"/>
             <category term="C++"/>
 
-        <updated>2023-07-29T11:33:32-07:00</updated>
+        <updated>2023-07-29T14:33:32-04:00</updated>
             <summary>
                 <![CDATA[
                     One problem that arises when interleaving SQL queries in C++ code is&hellip;
@@ -561,7 +561,7 @@ constexpr auto trucatedQuery = truncateWhitespace&lt;slimmedSize&gt;(originalQue
             <category term="Types"/>
             <category term="C++"/>
 
-        <updated>2023-07-29T11:30:57-07:00</updated>
+        <updated>2023-07-29T14:30:57-04:00</updated>
             <summary>
                 <![CDATA[
                     This article presents a simple way to cleanly define nested, multi-branch type&hellip;
@@ -729,7 +729,7 @@ auto root3 =
             <category term="Linux"/>
             <category term="Backup"/>
 
-        <updated>2023-07-29T11:29:47-07:00</updated>
+        <updated>2023-07-29T14:29:47-04:00</updated>
             <summary>
                 <![CDATA[
                     Until recently, my only computer was a 2013 MacBook Air. I backed&hellip;
@@ -809,7 +809,7 @@ echo &quot;personal backup complete ($(date))&quot; &gt;&gt; {{LOG_FILE}}
             <category term="Functional Programming"/>
             <category term="C++"/>
 
-        <updated>2023-07-29T11:28:24-07:00</updated>
+        <updated>2023-07-29T14:28:24-04:00</updated>
             <summary>
                 <![CDATA[
                     A popular idiom in functional programming is the use of sum types&hellip;
@@ -952,7 +952,7 @@ auto [val1, val2, val3] = get_ok(aggregate_res);
             <category term="Project"/>
             <category term="Programming"/>
 
-        <updated>2023-07-29T11:29:15-07:00</updated>
+        <updated>2023-07-29T14:29:15-04:00</updated>
             <summary>
                 <![CDATA[
                     Last month, I finally launched my collaborative map-based urban planning web application:&hellip;
@@ -988,7 +988,7 @@ auto [val1, val2, val3] = get_ok(aggregate_res);
             <category term="backend"/>
             <category term="Architecture"/>
 
-        <updated>2023-07-29T11:25:31-07:00</updated>
+        <updated>2023-07-29T14:25:31-04:00</updated>
             <summary>
                 <![CDATA[
                     Know your Data It is most important for a back-end developer to&hellip;
@@ -1045,7 +1045,7 @@ auto [val1, val2, val3] = get_ok(aggregate_res);
             <category term="Scheme"/>
             <category term="Functional Programming"/>
 
-        <updated>2023-07-29T11:27:41-07:00</updated>
+        <updated>2023-07-29T14:27:41-04:00</updated>
             <summary>
                 <![CDATA[
                     The goal of this article is to explain the purpose and functionality&hellip;
