@@ -3,12 +3,36 @@
     <title>Tech @ DG</title>
     <link href="https://tech.davidgorski.ca/feed.xml" rel="self" />
     <link href="https://tech.davidgorski.ca" />
-    <updated>2024-02-09T16:44:51-05:00</updated>
+    <updated>2024-02-23T11:13:38-05:00</updated>
     <author>
         <name>David Gorski</name>
     </author>
     <id>https://tech.davidgorski.ca</id>
 
+    <entry>
+        <title>Announcing My First Book: Introduction To Low Latency Programming</title>
+        <author>
+            <name>David Gorski</name>
+        </author>
+        <link href="https://tech.davidgorski.ca/announcing-my-book-introduction-to-low-latency-programming/"/>
+        <id>https://tech.davidgorski.ca/announcing-my-book-introduction-to-low-latency-programming/</id>
+
+        <updated>2024-02-23T11:13:38-05:00</updated>
+            <summary>
+                <![CDATA[
+                    I’m excited to announce the availability of my first technical book: Introduction&hellip;
+                ]]>
+            </summary>
+        <content type="html">
+            <![CDATA[
+                <p>I’m excited to announce the availability of my first technical book:</p>
+<p><strong>Introduction To Low Latency Programming</strong> </p>
+<p>Amazon Link: <a href="https://a.co/d/0U6KOfb">https://a.co/d/0U6KOfb</a></p>
+<p>It is a short, beginner-friendly entry into the domain of high-performance, bare metal coding. Learning low latency programming can be intimidating and online resources are scattered. Since there are no introductory books on the subject, my hope is that I can help programmers ‘kick start’ their entry into the domain gently. While this the book is not ‘deep’, it touches on important technical topics and ideas, provides many code examples and discusses the effects of modern hardware on optimization problems.</p>
+
+            ]]>
+        </content>
+    </entry>
     <entry>
         <title>Literary Programming</title>
         <author>
@@ -1031,132 +1055,6 @@ auto [val1, val2, val3] = get_ok(aggregate_res);
 <li>Re-use what you can</li>
 <li>Cherry-pick suitable design patterns (SOLID, functional, etc…), do not force</li>
 </ul>
-
-            ]]>
-        </content>
-    </entry>
-    <entry>
-        <title>The Fixed-Point Combinator Function</title>
-        <author>
-            <name>David Gorski</name>
-        </author>
-        <link href="https://tech.davidgorski.ca/the-fixed-point-combinator-function/"/>
-        <id>https://tech.davidgorski.ca/the-fixed-point-combinator-function/</id>
-            <category term="Scheme"/>
-            <category term="Functional Programming"/>
-
-        <updated>2023-07-29T14:27:41-04:00</updated>
-            <summary>
-                <![CDATA[
-                    The goal of this article is to explain the purpose and functionality&hellip;
-                ]]>
-            </summary>
-        <content type="html">
-            <![CDATA[
-                <p>The goal of this article is to explain the purpose and functionality of <strong>fixed-point combinator functions</strong>. I had a hard time following along with other articles on this topic so I wrote this as a learning exercise. We’ll be using the <strong>Scheme</strong> language.</p>
-<p>So what is a <strong>fixed-point combinator</strong>? It is a function which given a function as an argument, returns a fixed point of that function. Let’s demonstrate why this could be useful.</p>
-<p>First, let start by defining a factorial function recursively:</p>
-<pre><code>(define fact 
-  (lambda (n)
-    (if (zero? n) 1 (* n (fact (- n 1))))))
-</code></pre>
-<p>Theoretically, if our language suddenly loses recursion as a feature we run into a big problem; we can’t refer to a function that is not bound! There is no ‘self’ keyword inside a anonymous function (which would let us reference the function from within) and therefore the function will no longer be valid:</p>
-<pre><code>(lambda (n)
-  (if (zero? n) 1 (* n (??? (- n 1)))))
-</code></pre>
-<p>To clarify, the function is actually valid, but only for an input of <strong>0</strong>:</p>
-<pre><code>; 0 -&gt; 1
-
-((lambda (n)
-  (if (zero? n) 1 (* n (??? (- n 1))))) 0)
-</code></pre>
-<p>But if we try with any other value, it will fail:</p>
-<pre><code>; 1 -&gt; error: unbound symbol (???)
-
-((lambda (n)
-  (if (zero? n) 1 (* n (??? (- n 1))))) 1)
-</code></pre>
-<p>An input of <strong>1</strong> does not fulfill the first condition <strong>(zero?)</strong>, so it attempts to call <strong>???</strong> with <strong>(- n 1)</strong> as it’s argument. <strong>???</strong> is a symbol not bound to anything so an error is raised. However, we do know that for the current call the expression <strong>(- n 1)</strong> is equal to <strong>0</strong>, since <strong>n</strong> is bound to <strong>1</strong>. We know this function works for zero, so we know we can simply substitute it in for <strong>???</strong>. Now we have a function that works for two inputs: 0 and 1:</p>
-<pre><code>((lambda (n)
-  (if (zero? n)
-      1
-      (* n ((lambda (n)
-              (if (zero? n) 1 (* n (??? (- n 1))))) (- n 1))))) 1)
-</code></pre>
-<p>Using the former logic we can continue this process, replacing <strong>???</strong> with our ‘factorial’ lambda; creating a function that can work with another successive input. This could get tedious, so let’s write a function that does that for us.
-It will consume a function (f) and return the factorial function, replacing <strong>???</strong> with the input (f). If we provide this new function a factorial function it will have a factorial function to run if the term is not <strong>0</strong>.</p>
-<pre><code>(define fact-gen
-  (lambda (f)
-    (lambda (n)
-      (if (zero? n) 1 (* n (f (- n 1)))))))
-</code></pre>
-<p>By itself, the return value is our <strong>fact0</strong> function, which we used unbound earlier, Since an input of 0 doesnt call the <strong>f</strong> function, we can pass anything we’d like.</p>
-<pre><code>(define fact0 (fact-gen &#39;trash))
- -&gt; (lambda (next)
-      (lambda (n)
-        (if (zero? n) 1 (* n (&#39;trash (- n 1))))))
-
-(fact0 0) -&gt; 1
-</code></pre>
-<p>However, due to the conditional statement, if input is greater than <strong>0</strong>, the argument will be called, and that’s simply impossible as it is currently is just  a <strong>‘trash</strong> symbol.</p>
-<pre><code>(fact0 1) -&gt; ERROR
-</code></pre>
-<p>We need to supply a function that will give us the factorial of <strong>(- 1 1)</strong>. Wait a second… That expression equals <strong>0</strong>… We already have a function that gives us the factorial of <strong>0</strong>… Let’s run <strong>fact-gen</strong> and pass it <strong>fact0</strong>.</p>
-<pre><code>(define fact&lt;=1 (fact-gen fact0))
-</code></pre>
-<p>Using this newly generated function, we can find the factorial of any number equal or less than one. Can we continue? In fact, yes!</p>
-<pre><code>(define fact&lt;=2 (fact-gen fact&lt;=1))
-</code></pre>
-<p>Now the next step is clear. We need to supply the consecutive factorial function to the previous factorial function n + 1 times (starting at 0). How can we continually feed the <strong>fact-gen</strong> function these next factorial functions? Turns out that a combinator function can do that for us:</p>
-<pre><code>(define combinator
-  (lambda (func)
-
-    (define make-step
-      (lambda (next-step)
-        (lambda (arg)
-          ((func (next-step next-step)) arg))))
-
-    (lambda (arg)
-      ((func (make-step make-step)) arg))))
-</code></pre>
-<p>Notice that the returned lambda at the end of <strong>combinator</strong> function and the returned lambda for the locally scoped function <strong>make-step</strong>, are exactly the same. This is crucial. That means that when the generated factorial function needs the next factorial function, it simply inserts itself again. Let’s walk through this. Running <strong>(combinator fact-gen)</strong> will return:</p>
-<pre><code>; figure-1
-(lambda (arg)
-  ((fact-gen (make-step make-step)) arg))
-</code></pre>
-<p>When this function is called with any argument it will first resolve the expression <strong>(make-step make-step)</strong>. This function call will return the following:</p>
-<pre><code>; figure-2
-(lambda (arg)
-  ((fact-gen (make-step make-step)) arg))
-</code></pre>
-<p>Does this look familiar? Its the same as before! This is the fixed point. As seen in <strong>figure-1</strong>, this lambda (figure-2) will serve as the argument for the <strong>(fact-gen figure-2)</strong> function call, which returns:</p>
-<pre><code>; figure-3
-(lambda (n)
-      (if (zero? n) 1 (* n (figure-2 (- n 1)))))
-</code></pre>
-<p>Let’s call it with the argument of number ‘1’: <strong>(figure-3 1)</strong>. Since 1 is not <strong>zero?</strong> the control flow will evaluate the next expression: <em><em>(</em> 1 (figure-2 (- 1 1)))</em>*. Which includes the function call <strong>(figure-2 (- 1 1))</strong>. This will return the following:</p>
-<pre><code>((fact-gen (make-step make-step)) arg)
-</code></pre>
-<p><strong>(make-step make-step)</strong> will again return:</p>
-<pre><code>; figure-4
-(lambda (arg)
-  ((fact-gen (make-step make-step)) arg))
-</code></pre>
-<p>and the whole <strong>figure-2</strong> call will evaluate to:</p>
-<pre><code>; figure-5
-(lambda (n)
-      (if (zero? n) 1 (* n (figure-4 (- n 1)))))
-</code></pre>
-<p>Just to clarify, we are currently evaluating <em><em>(</em> 1 (figure-2 (- 1 1)))</em>*. <strong>n</strong> is bound to <strong>0</strong> in <strong>figure-5</strong>, so the <strong>if</strong> expression returns 1. Therefore everything resolves to:</p>
-<pre><code>(* 1 1) -&gt; 1
-</code></pre>
-<p>And that’s pretty much it. We can simplify the whole thing by eliminating our locale definition of <strong>make-step</strong> and replacing our readable variables with single letters:</p>
-<pre><code>(define Z
-  (lambda (f)
-      (lambda (a)
-        ((f ((lambda (y) (lambda (a) ((f (y y)) a)))
-             (lambda (y) (lambda (a) ((f (y y)) a))))) a))))
-</code></pre>
 
             ]]>
         </content>
