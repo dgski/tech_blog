@@ -3,12 +3,178 @@
     <title>Tech @ DG</title>
     <link href="https://tech.davidgorski.ca/feed.xml" rel="self" />
     <link href="https://tech.davidgorski.ca" />
-    <updated>2024-02-23T11:13:38-05:00</updated>
+    <updated>2024-02-26T15:42:03-05:00</updated>
     <author>
         <name>David Gorski</name>
     </author>
     <id>https://tech.davidgorski.ca</id>
 
+    <entry>
+        <title>Introduction To Low Latency Programming: Minimize Branching And Jumping</title>
+        <author>
+            <name>David Gorski</name>
+        </author>
+        <link href="https://tech.davidgorski.ca/introduction-to-low-latency-programming-minimize-branching-and-jumping/"/>
+        <id>https://tech.davidgorski.ca/introduction-to-low-latency-programming-minimize-branching-and-jumping/</id>
+            <category term="Low Latency"/>
+            <category term="C++"/>
+
+        <updated>2024-02-26T15:42:03-05:00</updated>
+            <summary>
+                <![CDATA[
+                    This post originally appears as a chapter in my new book: ‘Introduction&hellip;
+                ]]>
+            </summary>
+        <content type="html">
+            <![CDATA[
+                <p><em>This post originally appears as a chapter in my new book: ‘Introduction To Low Latency Programming’, a short and approachable entry into the subject. <a href="https://a.co/d/0U6KOfb">Available now for purchase on Amazon</a>.</em></p>
+<p>This chapter will discuss how branching and jumping in our code affects our runtime performance and how we can avoid them in our effort to reduce the latency of our programs. <strong>Branching</strong> refers to process execution that can go down one of multiple paths. This functionality is provided by ‘check and jump’ instructions. <strong>Jumping</strong> refers to when the program control pointer is changed to a different location in memory rather than progressing to the next sequential instruction. This can be conditional (as a part of branching) or unconditional.</p>
+<h2 id="what-does-it-cost">What Does It Cost?</h2>
+<p>Why do we want to discourage Jumping and/or Branching? Firstly, ‘comparing and jumping’ simply adds more instructions. As mentioned throughout the book, we want to minimize instructions overall. Secondly, branching disrupts the smooth flow of instruction prefetching, meaning if a condition that was not guessed by the branch predictor is encountered, the instruction pipeline has to potentially be flushed and refreshed. A new sequence of instructions will have to be retrieved.</p>
+<p>The branch predictor is an element of CPUs that aims to predict which branch will be taken in our code during runtime. Branch predictors have gotten more and more complex, but the fundamental idea is maintaining branching statistics and using them to determine where a program control address branch will most likely jump to. As mentioned in the previous paragraph, that prediction allows the pre-fetch of upcoming instructions.</p>
+<p>More instructions and instruction pipeline invalidation both contribute to the stalling of program execution. And stalling means we are not running the important instructions that directly contribute to fulfilling the business objectives. In an ideal world, our program would run these ‘golden instructions’ uninhibited.</p>
+<h2 id="examples-of-branching-and-jumping">Examples Of Branching And Jumping</h2>
+<p>The following short list contains <em>some</em> common code constructs which will generate jumping and/or branching instruction constructs:</p>
+<ul>
+<li><strong>Branching and Jumping</strong>: If statements, Chained boolean conditionals, Virtual method calls</li>
+<li><strong>Jumping:</strong> Function calls</li>
+</ul>
+<h2 id="steps-to-reduce-branchingjumping">Steps To Reduce Branching/Jumping</h2>
+<h3 id="branchless-boolean-expressions">Branchless Boolean Expressions</h3>
+<p>Standard boolean expression operations such as <code>&amp;&amp;</code> and <code>||</code> have ‘short-circuiting’ as a feature; if previous boolean expressions evaluate to false, consecutive expressions will not be evaluated:</p>
+<pre><code class="language-c++">const bool andExpression =
+  false /*will be evaluated*/ &amp;&amp;
+  true /* will not be evaluated*/;
+const bool orExpression =
+  true /*will be evaluated*/ ||
+  false /* will not be evaluated*/;
+</code></pre>
+<p>As expected, this introduces branching to our code and should be considered for removal. What do we use instead? You can use the bitwise AND and OR expressions:</p>
+<pre><code class="language-c++">const bool andExpression = false &amp; true; // Both will be evaluated
+const bool orExpression = true | false; // Both will be evaluated
+</code></pre>
+<p>When should you switch to this approach? There is a simple rule of thumb: switch from logical to bitwise boolean expressions when the overhead cost of branching does not outweigh the cost of evaluating all terms in the expression.</p>
+<p>It still makes sense to use logical boolean expressions if consecutive expressions are expensive to evaluate. Such the following:</p>
+<pre><code class="language-c++">const bool result = cheapCheck() &amp;&amp; expensiveCheck();
+</code></pre>
+<p>The short-circuiting branch allows us to avoid the expensive check, which the branchless, bitwise version would not. Tip: For the logical flavor, it makes sense to arrange the expressions in a chain from least to most expensive to enable short-circuiting before the largest computation costs would be incurred.</p>
+<p>Take a good look at the cost of the expression terms before deciding on using the branching or branchless boolean expressions.</p>
+<h3 id="write-code-which-generates-cmov-like-instructions">Write Code Which Generates ‘CMOV’-like instructions</h3>
+<p><code>CMOV</code> is a built-in instruction on the x86 architecture which does a ‘conditional move (copy)’. While spiritually similar to a branch, it is significantly cheaper than real ‘check and jump’. Since we are not writing assembly by hand, we won’t be directly implementing <code>CMOV</code> use. Rather, we will try to use code constructs that will be turned into <code>CMOV</code> instructions. One of these is ternary operator. Regardless, a good compiler will use <code>CMOV</code> when it can, even for if statements (when they simply assign to a value to a variable).</p>
+<p>Ternary operator use:</p>
+<pre><code class="language-c++">const int output = useFortyTwo() ? 42 : 24;
+</code></pre>
+<p>Make sure to measure the actual effect of using <code>CMOV</code> instructions with your program and data. Sometimes well-predicted branches can be more performant than <code>CMOV</code>.</p>
+<h3 id="remove-the-use-of-virtual-functions">Remove The Use Of Virtual Functions</h3>
+<p>Virtual function calls perform a jump. When it comes time to call the virtual function, the generated virtual lookup table is consulted for that class. Based on the values in the table, the correct implementation of the method will be ‘jumped to’ to in the executable. This incurs a cost to load the vtable as well a branching jump. Ideally, we will avoid virtual function calls in our programs. If you are using purely virtual classes as a form of interface, you can consider using C++20 concepts instead. They will allow you to constrain generic code and allow you to create ‘interfaces’ via <code>requires</code>.</p>
+<p>Of course, for leveraging dynamic dispatch (runtime specified code execution) there is no alternative to runtime branching / jumping. Other approaches such as using sum types (<code>std::variant</code>) or type erasure all perform the same relative types of instruction. Think about if you really need dynamic dispatch.</p>
+<h3 id="inline-your-functions">Inline Your Functions</h3>
+<p>Function inlining is another feature we can leverage to reduce jumps. In addition to jumping to a different location in our code and dealing with the costs of that, we also don’t have to pay the function call overhead. This overhead includes saving the register states, filling registers and/or the stack with the function arguments, incrementing the stack pointer, saving the stack return location and saving the current program control location. Function inlining puts a copy of the function body being called right at the call site. This can result in some great performance gains as there is no jump and the instruction pipeline is as simple as possible and spatially localized. You can use the GCC <code>always_inline</code> attribute above functions you want to be strictly inlined. For example:</p>
+<pre><code class="language-c++">[[gnu::always_inline]
+int function(int a) {
+  return a + 11232;
+}
+</code></pre>
+<p>Even though this function would have most likely already been inlined due to its simplicity, this attribute will forcefully encourage the compiler to do so, provide a warning to us if it is unable to, and also encodes the inlining objective within the code itself for all programmers to see.</p>
+<h2 id="compiler-hints">Compiler Hints</h2>
+<p>If branching is absolutely necessary in your code, you can use compiler hints to provide the compiler with extra information that it cannot infer. Using this information, the compiler will potentially re-order instructions in a way that will make the branch you marked as more ‘likely’ to be more efficient from a conditional branching perspective. This can be done using the <code>__builtin_expect</code> function or from C++20 and above with the <code>likely</code> and <code>unlikely</code> attributes. You can make the <code>__builtin_expect</code> function more ergonomic to use by creating <code>LIKELY</code> and <code>UNLIKELY</code> macros:</p>
+<pre><code class="language-c++">#define LIKELY(x) __builtin_expect(!!(x), 1)
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
+</code></pre>
+<p>Let’s explore a simple use case and it’s effects. Take a look at this simple function, and it’s corresponding assembly:</p>
+<p>C++:</p>
+<pre><code class="language-c++">void func(int input) {
+  if (input == 1) {
+    // BRANCH ONE
+  } else if (input == 2 ) {
+    // BRANCH TWO
+  } else {
+    // BRANCH THREE
+  }
+}
+</code></pre>
+<p>Assembly:</p>
+<pre><code class="language-asm">func(int): # @func(int)
+  movq %rdi, %rax
+  leaq 1(%rdi), %rcx
+  cmpl $2, %esi
+  je .LBB0_3
+  cmpl $1, %esi
+  jne .LBB0_4
+  # BRANCH ONE
+  retq
+.LBB0_3:
+  # BRANCH TWO
+  retq
+.LBB0_4:
+  # BRANCH THREE
+  retq
+</code></pre>
+<p>Notice that the <code>cmpl</code> instruction is first executed with ‘2’ as the argument. Only after, if we didn’t jump, it will execute with ‘1’. What if we know that the value in <code>$esi</code> is more likely to be equal to ‘1’ and we want to prioritize that branch? Let’s add a <code>LIKELY</code> annotation to our C++ code:</p>
+<pre><code class="language-c++">void func(int input) {
+  if (LIKELY(input == 1)) {
+    // BRANCH ONE
+  } else if (input == 2 ) {
+    // BRANCH TWO
+  } else {
+    // BRANCH THREE
+  }
+}
+</code></pre>
+<p>Now we can observe the different in output assembly:</p>
+<pre><code class="language-asm">func(int): # @func(int)
+  pushq %rbx
+  cmpl $1, %esi
+  jne .LBB0_1
+  # BRANCH ONE
+  retq
+.LBB0_1:
+  cmpl $2, %esi
+  jne .LBB0_4
+  # BRANCH TWO
+  retq
+.LBB0_4:
+  # BRANCH THREE
+  retq
+</code></pre>
+<p>As you can see, the compiler re-arranged the branching instructions. The comparison of <code>%eri</code> with 1 is now part of the first call to <code>cmpl</code> + <code>jne</code> and if equality is determined we don’t jump anywhere else. Spatially, we are already at the <code>BRANCH ONE</code> code. The compiler also moved the remaining conditionals after the first jump at <code>.LBB0_1:</code>. It is quite apparent that all remaining cases are deprioritized from an optimization standpoint in comparison to <code>BRANCH ONE</code>.</p>
+<p>Now for some semantic rambling. Even though they have been accepted as standard terms, likely and unlikely are not really accurate from a definition perspective. You are not really marking that one conditional branch is more likely than the other to occur. What you are doing is telling the compiler that you want to optimize for this conditional branch. Perhaps <code>OPTIMIZE</code> and <code>UNOPTIMIZE</code> are more accurate terms for our construct. Making your code as readable/understandable/surface-level as possible is always something worth pursuing.</p>
+<h2 id="cheaper-branching">Cheaper Branching</h2>
+<p>Not all ‘branching’ instructions are created equally. Consider the following function that that performs a few <strong>compare and jumps</strong>:</p>
+<pre><code class="language-c++">void processThisString(std::string_view input)
+{
+  if (input == &quot;production&quot;) {
+    processProd(input);
+  } else if (input == &quot;RC&quot;) {
+    processRC(input);
+  } else if (input == &quot;beta&quot;)
+    processBeta(input);
+  }
+}
+</code></pre>
+<p>This is a ‘run-of-the-mill’ if statement. However, we have an opportunity here: the comparison set is very constrained. In fact, most the calls to the <code>==</code> operator distill to a <code>memcmp</code> which will short circuit after the first character, since all the first characters in the string literals are different. For example, if the input’s value is “beta”, we will perform two calls to <code>==</code> for nothing. Instead, we can re-write this in a more efficient manner by using the <code>switch</code> construct on that first character:</p>
+<pre><code class="language-c++">void processThisString(std::string_view input)
+{
+  constexpr auto i = 0;
+  switch (input[i]) {
+    case &quot;production&quot;[i]: processProd(input); break;
+    case &quot;RC&quot;[i]: processRC(input); break;
+    case &quot;beta&quot;[i]: processBeta(input); break;
+  }
+}
+</code></pre>
+<p>The compiler will most likely generate a more efficient branching construct using jump tables and binary decision trees since data of only 1 char width is being compared now. A best-case scenario would be if the range of first character values is very limited, because then a single jump table would be used to increment the program control pointer. Of course, this is not cut and dry, because a small set of inputs may cause an if statement to perform better. Always measure! Regardless, this is a good approach to keep in mind for optimization.</p>
+<h2 id="chapter-summary">Chapter Summary</h2>
+<ul>
+<li>Jumping to distant code locations or branching can incur a heavy cost in low latency segments of the code. This is due to added instructions, instruction pipeline de-optimization and cache eviction.</li>
+<li>Examples of Branching/Jumping include: if statements, chained conditionals, virtual method calls, and function calls in general.</li>
+<li>You can avoid branching/jumping by using branchless conditionals, Using ‘CMOV’ instructions, Remove the use of virtual functions and try to inline your functions.</li>
+<li>If branching is unavoidable, try to use a ‘cheaper’ variation of it.</li>
+</ul>
+
+            ]]>
+        </content>
+    </entry>
     <entry>
         <title>Announcing My First Book: Introduction To Low Latency Programming</title>
         <author>
@@ -997,64 +1163,6 @@ auto [val1, val2, val3] = get_ok(aggregate_res);
 <h2 id="5-ruthlessly-prioritize-features-and-focus-on-releasing-anything">5. Ruthlessly Prioritize Features and Focus on Releasing Anything</h2>
 <p>It becomes very easy to delay a release. Feature and scope creep are real. And especially since you are the only person working on this project, your ego becomes tied up in it. You want it to be good enough, you start daydreaming of a big launch. So you keep adding more and more to the product. I caught myself doing this more than once during development. Now, after the initial release, I realized how important it is to get something out there into the real world. Not only do you get real feedback, but your self-pressure is taken off your shoulders. I have actually been able to accelerate development since release and added a handful new features: <a href="https://blog.plantogether.city/post/march-platform-updates/">9 New Features Added to Plan Together Since Launch</a></p>
 <p>Thanks for reading my article! Feel free to checkout <a href="https://plantogether.city">Plan Together</a>, or email me with comments/questions at <a href="mailto:dg@davidgorski.ca">dg@davidgorski.ca</a>.</p>
-
-            ]]>
-        </content>
-    </entry>
-    <entry>
-        <title>Back-End Development Basics</title>
-        <author>
-            <name>David Gorski</name>
-        </author>
-        <link href="https://tech.davidgorski.ca/back-end-development-basics/"/>
-        <id>https://tech.davidgorski.ca/back-end-development-basics/</id>
-            <category term="data"/>
-            <category term="backend"/>
-            <category term="Architecture"/>
-
-        <updated>2023-07-29T14:25:31-04:00</updated>
-            <summary>
-                <![CDATA[
-                    Know your Data It is most important for a back-end developer to&hellip;
-                ]]>
-            </summary>
-        <content type="html">
-            <![CDATA[
-                <h2 id="know-your-data">Know your Data</h2>
-<p>It is most important for a back-end developer to understand the characteristics of the Data their software will interact with. This includes both data inflows and data outflows. Questions such as the following need to be asked:</p>
-<ul>
-<li>How much data is incoming?</li>
-<li>What is the shape/type of the data?</li>
-<li>How should this data be processed?</li>
-<li>Where is this data needed or useful?</li>
-<li>What is the corresponding response to this type of data?</li>
-<li>How soon is a response needed?</li>
-</ul>
-<p>After careful deliberation and analysis, implementation details will naturally emerge regarding load balancing, API design, data structures, micro-service division of labor, parallelization of processing, replication, stream-publishing, table design, caching, relational vs key-value etc. </p>
-<p>The data is the canonical source for developing robust back-end endpoints and services. This is relevant from the high-level architectural decisions all the way to direct coding.</p>
-<p>For example, a service which handles low data volume, with simply query parameters, with low amounts of processing (CRUD), with no real-time requirements in response time, can and should be incredibly simple. There is no reason to over-complicate things. A basic load-balancer paired with a simple web-app and simple db is good enough (with regular backups of course).</p>
-<p>Conversely, a service which handles billions of requests a day, with high levels of processing, and many orthogonal services waiting for the data will need specialized streams/queues, parallel processing, advanced backup systems, specialized data structures with aggressive caching.</p>
-<h2 id="architecture">Architecture</h2>
-<h3 id="system-scaling">System scaling</h3>
-<p>For high-performance, high-throughput systems, it is important to get the basics right. Paying attention to the data you are dealing with, and analyzing the space and time complexities of your algorithms is crucial.</p>
-<ul>
-<li>Use appropriate algorithms and data structures</li>
-<li>Lift load on resources as soon as possible. (Early returns, forwarding requests to relevant module, etc)</li>
-<li>Check for and handle errors as early as possible. Prevent propagation of errors.</li>
-<li>Find a good point of modularity (monolith vs microservices)</li>
-<li>As simple as possible data distribution and replication pipeline.</li>
-<li>Determine level of Data normalization (optimize for speed vs optimize for reduction of redundancy)</li>
-</ul>
-<h3 id="maintainability">Maintainability</h3>
-<p>For large systems, it is important to build services for maintainability. This includes using:</p>
-<ul>
-<li>Clean, clear code</li>
-<li>Simple abstractions</li>
-<li>Microservices for separation of concern</li>
-<li>Well-defined, versioned APIS, as well as organization process for creating new endpoints</li>
-<li>Re-use what you can</li>
-<li>Cherry-pick suitable design patterns (SOLID, functional, etc…), do not force</li>
-</ul>
 
             ]]>
         </content>
