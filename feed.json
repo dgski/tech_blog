@@ -10,6 +10,20 @@
     },
     "items": [
         {
+            "id": "https://tech.davidgorski.ca/why-i-still-find-programming-inspiring-7-years-later/",
+            "url": "https://tech.davidgorski.ca/why-i-still-find-programming-inspiring-7-years-later/",
+            "title": "Why I Still Find Programming Inspiring, 8 Years Later",
+            "summary": "I’ve been programming for 8 years now. While there have been ups&hellip;",
+            "content_html": "<p>I’ve been programming for 8 years now. While there have been ups and downs, I’ve recently had a chance to reflect on my dual choice in career and hobby. It still means a lot to me.</p>\n<p>As an act of creative expression, it is truly unique. Programming is the act of creating <em>moving poetry</em>. Programs are not merely words at rest, they define and prescribe actions that will take place and interact with eachother. As a form of writing it is also much more dynamic; as code is more likely to be updated than articles, books or blogs.</p>\n<p>It also includes a foil to the creativity. There is a requirement for the application of the muse to be logical consistency. Code isn’t just free-for-all modern art. You have real rules to play within; providing a grounded world to inhabit. This ‘grounding’ provides objectivity to the sport and allows comparison and competition between pieces.</p>\n<p>Also, programming is hilariously useful. It enables our modern world to run. To re-quote for the millionth time: <em>Software is eating the world.</em> And it is not for nothing: automation frees humanity of mundane, repeat tasks while unlocking a new form of leverage. Write once; run infinity times. This is especially mind-boggling when realizing the reduced capital requirements in the face of traditional industries.</p>\n<p>It can be easy to become jaded towards one career and one’s craft. The fun, art, hacking is often overshadowed by business requirements and politics. I get that. But, when you pause and think, it is truly magical we get to make money with intellectual self-reflection.</p>\n<p>I realized that this is precisely the dark side of it all; the self is a little too involved in the job. It touches the ego, the intellect and the creative identity. For such a well-compensated and flexible job, the number of depressed and burnt-out developers is quite high.</p>\n<p>It has been prognosticated many times that the end of programming is nigh; thanks to the development of new no-code tools. And maybe this time, with AI and large language models, that will be true. But that doesn’t change that for a brief moment in history, humans could talk to machines using their native language. And that’s more than kinda neat.</p>\n",
+            "author": {
+                "name": "David Gorski"
+            },
+            "tags": [
+            ],
+            "date_published": "2024-03-13T14:31:52-04:00",
+            "date_modified": "2024-03-13T14:31:52-04:00"
+        },
+        {
             "id": "https://tech.davidgorski.ca/introduction-to-low-latency-programming-external-processing/",
             "url": "https://tech.davidgorski.ca/introduction-to-low-latency-programming-external-processing/",
             "title": "Introduction To Low Latency Programming: External Processing",
@@ -22,8 +36,8 @@
                    "Low Latency",
                    "C++"
             ],
-            "date_published": "2024-03-11T10:39:16-05:00",
-            "date_modified": "2024-03-11T10:39:16-05:00"
+            "date_published": "2024-03-11T11:39:16-04:00",
+            "date_modified": "2024-03-11T11:39:16-04:00"
         },
         {
             "id": "https://tech.davidgorski.ca/introduction-to-low-latency-programming-understand-storage/",
@@ -38,8 +52,8 @@
                    "Low Latency",
                    "C++"
             ],
-            "date_published": "2024-03-04T11:01:37-06:00",
-            "date_modified": "2024-03-04T11:01:37-06:00"
+            "date_published": "2024-03-04T12:01:37-05:00",
+            "date_modified": "2024-03-04T12:01:37-05:00"
         },
         {
             "id": "https://tech.davidgorski.ca/introduction-to-low-latency-programming-minimize-branching-and-jumping/",
@@ -54,8 +68,8 @@
                    "Low Latency",
                    "C++"
             ],
-            "date_published": "2024-02-26T14:42:03-06:00",
-            "date_modified": "2024-02-26T14:42:03-06:00"
+            "date_published": "2024-02-26T15:42:03-05:00",
+            "date_modified": "2024-02-26T15:42:03-05:00"
         },
         {
             "id": "https://tech.davidgorski.ca/announcing-my-book-introduction-to-low-latency-programming/",
@@ -68,8 +82,8 @@
             },
             "tags": [
             ],
-            "date_published": "2024-02-23T10:12:14-06:00",
-            "date_modified": "2024-02-23T10:13:38-06:00"
+            "date_published": "2024-02-23T11:12:14-05:00",
+            "date_modified": "2024-02-23T11:13:38-05:00"
         },
         {
             "id": "https://tech.davidgorski.ca/literary-programming/",
@@ -84,8 +98,8 @@
                    "style",
                    "Programming"
             ],
-            "date_published": "2024-02-09T15:41:04-06:00",
-            "date_modified": "2024-02-09T15:44:51-06:00"
+            "date_published": "2024-02-09T16:41:04-05:00",
+            "date_modified": "2024-02-09T16:44:51-05:00"
         },
         {
             "id": "https://tech.davidgorski.ca/c-mini-pattern-deriving-from-stdvariant/",
@@ -98,8 +112,8 @@
             },
             "tags": [
             ],
-            "date_published": "2024-01-09T21:00:00-06:00",
-            "date_modified": "2024-01-31T19:59:35-06:00"
+            "date_published": "2024-01-09T22:00:00-05:00",
+            "date_modified": "2024-01-31T20:59:35-05:00"
         },
         {
             "id": "https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search/",
@@ -112,8 +126,8 @@
             },
             "tags": [
             ],
-            "date_published": "2023-12-17T13:32:39-06:00",
-            "date_modified": "2023-12-18T08:36:35-06:00"
+            "date_published": "2023-12-17T14:32:39-05:00",
+            "date_modified": "2023-12-18T09:36:35-05:00"
         },
         {
             "id": "https://tech.davidgorski.ca/truncating-string-white-space-at-compile-time-in-c/",
@@ -129,8 +143,8 @@
                    "Programming",
                    "C++"
             ],
-            "date_published": "2021-04-17T11:00:00-05:00",
-            "date_modified": "2023-07-29T13:33:32-05:00"
+            "date_published": "2021-04-17T12:00:00-04:00",
+            "date_modified": "2023-07-29T14:33:32-04:00"
         },
         {
             "id": "https://tech.davidgorski.ca/using-c17-to-create-composable-recursive-data-types/",
@@ -145,24 +159,8 @@
                    "Types",
                    "C++"
             ],
-            "date_published": "2021-03-21T13:30:00-05:00",
-            "date_modified": "2023-07-29T13:30:57-05:00"
-        },
-        {
-            "id": "https://tech.davidgorski.ca/a-simple-personal-data-backup-setup-2/",
-            "url": "https://tech.davidgorski.ca/a-simple-personal-data-backup-setup-2/",
-            "title": "A Simple Personal Data Backup Setup",
-            "summary": "Until recently, my only computer was a 2013 MacBook Air. I backed&hellip;",
-            "content_html": "<p>Until recently, my only computer was a 2013 MacBook Air. I backed it up using the included Time Machine system and an external spinning disk hard drive. With the nature of it being a laptop, I didn’t have the external drive plugged in all the time, and so I set a calendar reminder to do a weekly backup because I knew I wouldn’t do it daily. It’s embarrassing to admit that even as a ‘tech professional’, there were plenty of weeks that I skipped backing up my content. I was used to the computer working all the time, I was busy and I always had some excuse to ignore the reminders. MacOS Notifications would beg me to do something:</p>\n<pre><code>It has been 3 weeks since you backed up your computer! You&#39;re asking for data loss chump!\n</code></pre>\n<p>It’s pretty obvious that in order for it to function properly, you need an automatic backup system. Otherwise, human complacency and laziness take over. Your data needs to be backed up without any input from you. Having recently undertaken an initiative to upgrade and enhance my personal technology setup, I knew I could do better.</p>\n<h2 id=\"my-overall--requirements\">My Overall  Requirements</h2>\n<ol>\n<li>Multiple copies of my data to survive hardware/software failure.</li>\n<li>Live data synchronization between my MacBook and new Linux Workstation.</li>\n<li>Snapshots available for restore.</li>\n<li>Remote copies of my data.</li>\n</ol>\n<h2 id=\"the-guiding-principle---321\">The Guiding Principle - 3,2,1</h2>\n<p>This is something that is obvious, but it really is the bare minimum, even for your personal data. The <a href=\"https://us-cert.cisa.gov/sites/default/files/publications/data_backup_options.pdf\">3,2,1 rule</a> states that you need:</p>\n<ul>\n<li><strong>3 backups</strong>: 3 total copies of your data.</li>\n<li><strong>2 local</strong>: 2 locally available copies.</li>\n<li><strong>1 remote</strong>: 1 off-site copy.</li>\n</ul>\n<p>If you satisfy these requirements, your chance of data loss is incredibly slim.</p>\n<h2 id=\"local-first\">Local First</h2>\n<p>There are many fancy approaches to create local, automatic, backup systems. Fundamentally, they lean on having a dedicated device, on-prem, holding your data. These options included:</p>\n<ul>\n<li>Purpose-built Network Attached Storage with multiple storage bays</li>\n<li>Raspberry Pi with added hardware</li>\n<li>Full Data Server</li>\n</ul>\n<p>For my needs, these were a little overkill. I wasn’t planning on using my backup as a streaming source or personal media server. I just really needed my data to be synchronized between my Macbook and my Linux Workstation. Surely there must be a simple solution for this? Luckily for me, I found <a href=\"https://syncthing.net/\">Syncthing</a>. I am very satisfied with the operational simplicity of this tool. I can just point the app to my data folder on each device, and it does the rest. The included ignore pattern functionality is also very useful in reducing the synchronization data volume amount. The nice effect of live synchronization is that the data changes are immediately reflected on the other machine.</p>\n<p>However, even though live synchronization maintains two copies of my data it is <strong>not</strong> a replacement for true backups! What if the data became corrupted on one device? The daemon would sync this corruption to the other device and I would lose content! This is what <strong>versioned backups</strong> prevent by creating snapshots of your data at certain points in time. Because my use case is simple, I am delegating versioned backups to the remote backup element. </p>\n<h2 id=\"remote-backups\">Remote Backups</h2>\n<p>With a live synchronization system working locally, I set out to add a remote backup portion to the setup. My personal stuff is not mission-critical. Maybe yours is, but mine isn’t, so a remote backup frequency of once per day was enough. Anyways, I settled on the following requirements:</p>\n<ol>\n<li><strong>Inexpensive</strong>: I don’t want to break the bank.</li>\n<li><strong>Encrypted</strong>: I’m not a privacy nut, but something still feels wrong about giving someone else carte blanche access to my data. </li>\n<li><strong>Scheduled</strong>: I would like this backup to run once a day.</li>\n<li><strong>Open-Source</strong>: This is important for two reasons: I don’t want to be locked-in and I want to be sure the app does what it says it does.</li>\n</ol>\n<p>To make a long story short; I ended up using <a href=\"https://en.wikipedia.org/wiki/Anacron\">anacron</a> and <a href=\"http://duplicity.nongnu.org/\">duplicity</a> with <a href=\"https://www.backblaze.com/b2/cloud-storage.html\">Backblaze B2</a> on my Linux Workstation.</p>\n<p><strong>Anacron</strong> allows task scheduling for devices that are not always on. So if you schedule something to run once a day, as long as your computer is on for a portion of the day; it will run.</p>\n<p><strong>Duplicity</strong> is an amazing all-in-one encryption and upload command-line backup tool. It supports full and partial backups along with support for most cloud providers. I set it up to delete the partial incremental backups after 30 days and do a full backup to save space in the long run.</p>\n<p><strong>Backblaze B2</strong> is an solid, inexpensive online storage provider. It provided all the features I needed and is compatible with duplicity out of the box.</p>\n<p>The following is templated copy of my backup script. Please note the <strong>firefox profile backup</strong> and the use of <strong>systemd-inhibit</strong> to prevent shutting down the computer while the backup is in progress:</p>\n<pre><code class=\"language-bash\"># Sync firefox profile into data folder\nrsync -a {{FIRFOX_FOLDER}} {{DATA_FOLDER}}\n\n# Push latest changes to cloud\nsystemd-inhibit --why=&quot;Daily Backup In-Progress&quot; duplicity \\\n    --verbosity 8 \\\n    {{DATA_FOLDER}} \\\n    {{CLOUD_ENPOINT_AND_API_KEY}} \\\n    --asynchronous-upload \\\n    --full-if-older-than 1M \\\n    --allow-source-mismatch \\\n    &gt;&gt; {{LOG_FILE}}\n    \necho &quot;personal backup complete ($(date))&quot; &gt;&gt; {{LOG_FILE}}\n</code></pre>\n<h2 id=\"epilogue\">Epilogue</h2>\n<p>Since setting up this system, not a single part of has failed. And maybe, it never will. But I am no longer embarrassed of my backup system and I sleep a little better at night. Please take this as a reminder to back your important stuff up. Hopefully you’ll never have to thank me!</p>\n",
-            "author": {
-                "name": "David Gorski"
-            },
-            "tags": [
-                   "Linux",
-                   "Backup"
-            ],
-            "date_published": "2021-03-13T13:29:00-06:00",
-            "date_modified": "2023-07-29T13:29:47-05:00"
+            "date_published": "2021-03-21T14:30:00-04:00",
+            "date_modified": "2023-07-29T14:30:57-04:00"
         }
     ]
 }
