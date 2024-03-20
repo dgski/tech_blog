@@ -3,12 +3,60 @@
     <title>Tech @ DG</title>
     <link href="https://tech.davidgorski.ca/feed.xml" rel="self" />
     <link href="https://tech.davidgorski.ca" />
-    <updated>2024-03-18T11:09:52-04:00</updated>
+    <updated>2024-03-20T13:11:49-04:00</updated>
     <author>
         <name>David Gorski</name>
     </author>
     <id>https://tech.davidgorski.ca</id>
 
+    <entry>
+        <title>Imagining Further Decentralization For NOSTR</title>
+        <author>
+            <name>David Gorski</name>
+        </author>
+        <link href="https://tech.davidgorski.ca/what-nostr-the-decentralized-social-network-is-missing/"/>
+        <id>https://tech.davidgorski.ca/what-nostr-the-decentralized-social-network-is-missing/</id>
+
+        <updated>2024-03-20T13:11:49-04:00</updated>
+            <summary>
+                <![CDATA[
+                    What is NOSTR? I’ve recently started looking at decentralized social network options.
+                ]]>
+            </summary>
+        <content type="html">
+            <![CDATA[
+                <h1 id="what-is-nostr">What is NOSTR?</h1>
+<p>I’ve recently started looking at decentralized social network options. They promise resistance to censorship and central control. One such network, or rather protocol, is NOSTR, which is an acronym for <strong>Notes and Other Stuff Transmitted by Relays</strong>. It’s adoption and potential is a function of its simplicity:</p>
+<ol>
+<li>Users generate a private/public key pair as an identity.</li>
+<li>Content is published via websocket to one or more relays. Signed with the private key.</li>
+<li>Content is requested via websocket from one or more relays. Verified with the public key.</li>
+</ol>
+<p>That’s pretty much it. While there are also some standards that define the JSON format for particular messages; the above list adequately summarizes how the entire network functions. When you ‘follow’ a user, in it’s simplest form, your NOSTR client will add them to a local list and request their content from the relays you are connected to. The users public key will be checked against each signature to ensure the relays aren’t ‘lying’ to you. By publishing and requesting content via multiple relays, one relay is not a single point of failure or control.</p>
+<h1 id="current-drawbacks">Current Drawbacks</h1>
+<p>This is a good start and the simplicity is a key selling point. Simple technology can be adopted by developers and users much faster. I wrote a simple C++ NOSTR relay in a few hours myself: <a href="https://github.com/dgski/nostr_relay_lite">nostr_relay_lite</a>. However, there are still some shortcomings when it comes to absolute full decentralization and central control resistance:</p>
+<ol>
+<li>Reliance on Relays.</li>
+<li>Reliance on the DNS (Domain Name System).</li>
+<li>Reliance on ISP (Internet Service Providers).</li>
+</ol>
+<h2 id="reliance-on-relays">Reliance on Relays</h2>
+<p>The first obvious issue is that if all relays you publish to refuse to serve your content, none of your followers will be able to receive your content. Perhaps a powerful entity could enact pressure on the relays for them to do so. The solution, of course, is running your own relay. Unfortunately this introduces complexity and brittleness. You will have to set up and maintain a server while simultaneously broadcasting its existence. Other relays, already censoring your other content, would prevent the propagation of your endpoint.</p>
+<h2 id="reliance-on-dns">Reliance on DNS</h2>
+<p>If you’ve begun hosting your own Relay, chances are you’ve put it behind a domain name. Unfortunately, the DNS system, controlled by a few select, organizations could easily ‘delist’ you. To prevent his you will have to use a raw static IP address instead of a domain name. This has its own obvious drawbacks.</p>
+<h2 id="reliance-on-isps">Reliance on ISPs</h2>
+<p>So, you’ve stopped using DNS, and now you’re in the clear, right? Wrong. Your ISP could still cut you off. Just as with DNS or Relay providers, if enough pressure was enacted, your internet access could be pulled and your relay server would not be able to serve your content. This is the hardest layer of the network to ‘fix’ with current technology and infrastructure. I don’t have any actionable ideas here.</p>
+<h1 id="looking-forward-building-a-decentralized-holy-grail">Looking Forward: Building A Decentralized Holy Grail</h1>
+<p>There is one big theme here: servers are the problem. For the purpose of decentralization, in an ideal world, users would communicate directly with each other; each client simultaneously functioning as a client and relay. </p>
+<p>Peer-to-Peer communication technologies have existed for quite some time and could be leveraged to address this, each user effectively hosting a server and a client simultaneously. There are networking tricks such as hole-punching to connect to devices directly behind NAT (Network Address Translation). Another technology to look at, as it has browser support, is WebRTC, although it currently requires an external channel for the initial connection. Perhaps it could be extended to allow one-way connections to open ports. IPv6 also might help here, as every machine could theoretically be granted a unique public IP address.</p>
+<p>Now regarding DNS, we can switch to a decentralized alternative. Rather than use the centralized DNS system managed by ICANN, clients could switch to using blockchain-based DNS. This would allow P2P relay owners to ‘publish’ the information needed to directly connect to their host machine. Even without a static IP address, a dynamic DNS feature could update this record as your IP address changes locally. An alternative to blockchain could be a DHT (Dynamic Hash Table) with private key signatures to ensure resolved IP address and port is approved by the user. This, however, would not allow for human-readable DNS and would simply be a mapping of public keys (identities) to IP addresses. Additionally, without a blockchain where there are codified rules for updating the ledger with payments, nodes could simply refuse to propagate your DHT entries, thus allowing for censorship.</p>
+<p>Finally, what about ISPs? No good answers here, unfortunately. The only solution would be build out a WLAN/Bluetooth Mesh Network that covers majority of the population. Devices would connect to one another directly via a wireless network and transmit packets (Prior art: FireChat, Amazon Sidewalk). This would be a huge challenge logistically and technologically; mesh networks are hard to scale. And just to add a touch of paranoia; some wired and line-of-sight links would also be necessary in the case of radio frequency jamming.</p>
+<p>Theoretically, one could build an integrated ‘NOSTR appliance’ that would allow connection to the mesh network, with a DDDNS (Decentralized Dynamic Domain Name System) or DHT (Decentralized Hash Table) and P2P networking built-in. This would allow non-tech users to link into this new ‘freedom network’; you just buy the product and get online; fully decentralized. Of course, this would not just be great for resisting censorship, but providing communication and connectivity in times of emergencies. To further remove centralization, this unit would ideally be powered via locally generated electricity to prevent your power provider from cutting off your ability to communicate.</p>
+<p>I want to finish off this post by saying that the value of decentralized systems is not only in their use, but in their existence. Having them standing by provides pressure on incumbent centralized systems not to push their luck when it comes to policy and enforcement. Perhaps decentralization to the level I’ve described here is not necessary, but somewhere between what we have now and my theoretical NOSTR appliance, is a decentralized system that is possible and practical. </p>
+
+            ]]>
+        </content>
+    </entry>
     <entry>
         <title>Introduction To Low Latency Programming: Clarify Program Scope</title>
         <author>
@@ -904,203 +952,6 @@ branchlessTime = 23558000
 stdTime        = 15002000
 </code></pre>
 <p>As you can see the benefits start to deteriorate as the array size grows.</p>
-
-            ]]>
-        </content>
-    </entry>
-    <entry>
-        <title>Truncating String White-space At Compile Time in C++</title>
-        <author>
-            <name>David Gorski</name>
-        </author>
-        <link href="https://tech.davidgorski.ca/truncating-string-white-space-at-compile-time-in-c/"/>
-        <id>https://tech.davidgorski.ca/truncating-string-white-space-at-compile-time-in-c/</id>
-            <category term="constexpr"/>
-            <category term="Programming"/>
-            <category term="C++"/>
-
-        <updated>2023-07-29T14:33:32-04:00</updated>
-            <summary>
-                <![CDATA[
-                    One problem that arises when interleaving SQL queries in C++ code is&hellip;
-                ]]>
-            </summary>
-        <content type="html">
-            <![CDATA[
-                <p>One problem that arises when interleaving SQL queries in C++ code is string literal formatting and spacing. Most queries are much more human-digestible in a multi-line format. C++ treats adjacent string literals as one, so the traditional C++ solution is this:</p>
-<pre><code class="language-c++">const char* query =
-    &quot; SELECT &quot;
-        &quot; u.id, &quot;
-        &quot; u.user_name, &quot;
-        &quot; u.ref_id, &quot;
-        &quot; u.postal_code, &quot;
-        &quot; u.email, &quot;
-        &quot; o.transaction.id &quot;
-    &quot; FROM &quot;
-        &quot; users u &quot;
-    &quot; JOIN &quot;
-        &quot; orders o ON o.user_id = u.id &quot;
-    &quot; WHERE &quot;
-        &quot; u.id=? AND u.active=? &quot;;
-</code></pre>
-<p>A programmer has to be very careful with the white-space before and after the SQL tokens as their presence or lack-thereof could be the difference between a good night’s sleep, or a run-time exception triggering a on-call alert late at night. Fun! Overall this code snippet is much more difficult to read due to the syntactical mess of quotation marks around it. To help prevent issues I have even heard this old platitude from a veteran C++ programmer: “A good surgeon washes his hands before and after the surgery”; mandating spaces at the beginning and end of each line. Is a rule of thumb really a best practice? One’s best work is done with as little distraction as possible, and this is something else to worry about.</p>
-<p>Modern C++ provides us with one useful addition that can help mitigate this issue: the raw string literal. Leveraging this feature we can write the query naturally; all within one pair of quotations:</p>
-<pre><code class="language-c++">const char* query = R&quot;(
-    SELECT
-        u.id,
-        u.user_name,
-        u.ref_id,
-        u.postal_code,
-        u.email,
-        o.transaction.id
-    FROM
-        users u
-    JOIN
-        orders o ON o.user_id = u.id
-    WHERE
-        u.id=? AND u.active=?
-)&quot;;
-</code></pre>
-<p>This works rather well. You can define the same exact query, presented very simply and clear. You don’t have to ‘worry’ about the C++ surrounding the SQL. You can just focus on the SQL. The problem is, all those spaces, tabs and newline characters are also in the final query string. The raw string is <strong>298 characters</strong> long versus the original <strong>166 characters</strong>. This means you pass a query string that is almost <strong>double in length</strong> to any query parsing function/module. Now, with the performance of modern hardware this penalty is negligible. However, sometimes, this code is ran in a hot path or you might have a sense of guilt for such an obvious efficiency sacrifice. Let’s make things right in the universe…</p>
-<p>The first, conceptually simplest, obvious solution is to run a string-slimming function on all queries when program execution starts. This approach is good enough, but all sub-approaches in this branch have disadvantages:</p>
-<ul>
-<li>If you want the query to be ready before a certain function is called, you will unfortunately have to move the query variable out of it’s logical code block. This can reduce the clarity of intent and logic locality.</li>
-<li>If you want to keep the query nested where it’s used, you will have to devise some kind of static initialization function that runs the first time the function is called. A static flag will have to be checked every time the function is called to determine whether the string has been ‘slimmed’ yet.</li>
-<li>You will need to allocate a new destination buffer for the ‘slimmed’ query.</li>
-</ul>
-<p>As suggested by this article’s title we can actually do this string processing at compile time, with no penalty to our code’s logic or clarity. </p>
-<h2 id="contexpr-variables-functions-and-classes">‘contexpr’ Variables, Functions and Classes</h2>
-<p>Modern C++ provides the <a href="https://en.cppreference.com/w/cpp/language/constexpr">constexpr</a> functionality to provide compile-time code utilities. There are a lot of resources available online detailing this, so I won’t go into detail. Fundamentally, you can mark your functions, classes and variables with the <strong>constexpr</strong> keyword to signify they could potentially be called or created at compile time. This is not a guarantee, but a contract of sorts. A summary of the rules:</p>
-<ul>
-<li>A <strong>constexpr variable</strong> must be initialized as a constexpr type with a constepxr function. These must be constructed/called with either literals or other constexpr variables as arguments.</li>
-<li>A <strong>constexpr function</strong> can only take and return constexpr types. The key thing to know is that arguments can be accepted as constexpr, but not passed on as constexpr. Once within the function you cannot guarantee the argument values are known at compile time, even though they might be.</li>
-<li>A <strong>constexpr type/class</strong> can only have constexpr type members and must at least one constexpr constructor. All scalar types and arrays are considered constexpr.</li>
-</ul>
-<p>I’m fairly new to <strong>constexpr</strong> myself, so please do your own research, and reach out if I’m incorrect.</p>
-<h2 id="implementing-a-compile-time-string">Implementing a Compile Time String</h2>
-<p>In order to perform our string parsing/creation at compile time, we need to implement a string class that satisfies the constexpr ‘contract’ for types. We must ensure that all methods we want to call after the constexpr variable construction are marked as ‘const’. The implementation is pretty self explanatory when keeping in mind the restrictions:</p>
-<pre><code class="language-c++">namespace compiletime {
-
-template&lt;std::size_t MaxSize = 30&gt;
-class string
-{
-    char m_data[MaxSize] = { 0 };
-    std::size_t m_size;
-public:
-    constexpr string() : m_data({}), m_size(0) {}
-    constexpr string(const char* str) : m_data(), m_size(0) {
-        for(int i =0; i&lt;MaxSize; ++i) {
-            m_data[m_size++] = str[i];
-        }
-    }
-    
-    constexpr char const* data() const { return m_data; }
-    constexpr operator const char*() const { return data(); } // for convenience
-    constexpr void push_back(char c) { m_data[m_size++] = c; }
-    constexpr char&amp; operator[](std::size_t i) { return m_data[i]; }
-    constexpr char const&amp; operator[](std::size_t i) const { return m_data[i]; }
-    constexpr size_t size() const { return m_size; }
-    constexpr const char* begin() const { return std::begin(m_data); }
-    constexpr const char* end() const { return std::begin(m_data) + m_size; }
-};
-
-}
-</code></pre>
-<h2 id="2-implementing-a-compile-time-parser">2. Implementing a Compile Time Parser</h2>
-<p>Now that we have a string class that can used with <strong>constexpr variables</strong>, we can run <strong>constepxr</strong> functions that take this string type as arguments. Remember, in constexpr functions all arguments can be accepted as constexpr, but not passed as constexpr. Additionally, we can only use other constexpr functions and types within the function.</p>
-<p>First, let’s implement a simple function which checks if a provided character is a whitespace character:</p>
-<pre><code class="language-c++">constexpr bool is_whitespace(char c) {
-    return
-        (c == &#39; &#39;) ||
-        (c == &#39;\t&#39;) ||
-        (c == &#39;\n&#39;) ||
-        (c == &#39;\v&#39;) ||
-        (c == &#39;\f&#39;) ||
-        (c == &#39;\r&#39;);
-}
-</code></pre>
-<p>Notice the <em>constexpr</em> keyword as well as the fact that all types used (char) are constexpr-friendly. The actual ‘business logic’ is self-explanatory.</p>
-<p>Moving on and focusing on our goal, the function we want to implement takes one <strong>compiletime::string</strong>, iterates over it, and removes consecutive white-space and newlines. This can be done via a simple for-loop, with <strong>push_back</strong> calls appending the preserved characters to a new <strong>compiletime::string</strong> instance. A few predicates allow us to keep track of the parser state. Check it out:</p>
-<pre><code class="language-c++">template&lt;std::size_t N&gt;
-constexpr auto truncateWhitespace(compiletime::string&lt;N&gt; str) {
-    // Need to use non-type template for string max size
-    compiletime::string&lt;N&gt; result;
-    bool previousIsWhitespace = false; // Keep track if the previous character was whitespace
-    for(char c : str) {
-        // Skip new lines
-        if(c == &#39;\n&#39;) {
-            continue;
-        } else if(is_whitespace(c)) {
-            // If the last character was whitespace, continue interation
-            if(previousIsWhitespace) {
-                continue;
-            }
-            // Whitespace: Set flag
-            previousIsWhitespace = true;
-        } else {
-            // Not whitespace: Reset flag
-            previousIsWhitespace = false;
-        }
-
-        result.push_back(c); // Otherwise; add character to new string
-    }
-    return result;
-}
-</code></pre>
-<p>And finally, we can provide a simple overload to allow direct string literal use:</p>
-<pre><code class="language-c++">template&lt;std::size_t N&gt;
-constexpr auto truncateWhitespace(const char (&amp;str)[N])
-{
-    compiletime::string&lt;N&gt; tmp(str); // build instance
-    return truncateWhitespace(tmp); // run function
-}
-</code></pre>
-<h2 id="the-spoils">The Spoils</h2>
-<p>Now, we can actually use this construct in our code:</p>
-<pre><code class="language-c++">constexpr auto query = R&quot;(
-    SELECT
-        u.id,
-        u.user_name,
-        u.ref_id,
-        u.postal_code,
-        u.email,
-        o.transaction.id
-    FROM
-        users u
-    JOIN
-        orders o ON o.user_id = u.id
-    WHERE
-        u.id=? AND u.active=?
-)&quot;;
-
-constexpr auto trucatedQuery = truncateWhitespace(query);
-std::cout &lt;&lt; trucatedQuery;
-// output:
-// &quot; SELECT u.id, u.user_name, u.ref_id, u.postal_code, u.email, o.transaction.id FROM users u JOIN orders o ON o.user_id = u.id WHERE u.id=? AND u.active=? &quot;
-</code></pre>
-<p>The new query length is <strong>154 characters</strong>! Which beats obviously beats the original raw literal (294) and the old “spaces before and after” mantra with traditional one-line string literals (162). And we can validate that this is actually happening at compile time with a <a href="https://www.google.com/search?channel=fs&amp;client=ubuntu&amp;q=static+assert">static_assert</a>. If you are using a modern IDE/Editor with C++ integration the following statement will actually be highlighted as a failed assertion before running compilation:</p>
-<pre><code>static_assert(trucatedQuery.size() == 154);
-</code></pre>
-<p>We have succeeded and in the process gained advantages over both previous approaches:</p>
-<ul>
-<li><strong>Clearer and less cluttered code site</strong>: Freedom to use raw string literals to format queries with as much indentation as you’d like.</li>
-<li><strong>Neater, Compact Logging</strong>: New lines scattered in log files make them harder to parse and understand.</li>
-<li><strong>Less Network Bandwidth Usage</strong>: If you are using a database that directly accepts the query string, you will be sending half the bytes over the network.</li>
-<li><strong>Faster Performance</strong>: If you do any local string validation/processing/formatting, you will gain some performance.</li>
-</ul>
-<p>For the sake of it, I did a simple benchmark comparing the generated <strong>compile_time::string</strong> buffer to a <strong>const char</strong>* with the exact same literal. On my system, iterating over the provided string using a simple pointer and while loop resulted in consistently faster performance averaged over many iterations. I would be greatly concerned if it didn’t, as there is now half as many characters as before! A simple O(N) iteration operation will obviously be faster on less elements.</p>
-<p>I can see this technique providing excellent payoff for queries with many joins and deeper indentation (maybe in a lambda inside a class member function or something), sent over the network and parsed on a regular, frequent basis. It’s also just feels great, knowing you’ve reached the holy grail of performance; aka compile time operations.</p>
-<h2 id="limitations">Limitations</h2>
-<p>There is one obvious limitation of this approach. Even though the ‘string’ value is shortened, we pack a buffer of the original size into the executable, padded with zeroes at the end of the string. This is because the final string size is needed as a compile time template value to construct the string class. Unfortunately, once we’re inside the <strong>truncateWhitespace</strong> function, we can’t retrieve the length to use with the string type. We also can’t make any assumptions about what the final size will be as there may not be any superfluous white-space (A simple N / 2 estimate could result in compilation failures in some cases). You could solve this this by implementing a constexpr function to calculate the final length before doing the actual truncation. Something like this:</p>
-<pre><code class="language-c++">constexpr const char originalQuery[] = R&quot;(...)&quot;;
-constexpr std::size_t slimmedSize = calculateTruncatedWhitespaceSize(originalQuery);
-constexpr auto trucatedQuery = truncateWhitespace&lt;slimmedSize&gt;(originalQuery);
-</code></pre>
-<p>I cannot currently think of a way to do this in a way does not leverage a macro, as we can’t create function to wrap this functionality, since the arguments would not be considered constexpr inside and therefore could not be used calculate a constexpr length to be provided as a non-type template parameter to the string class. Please let me know if you can suggest a technique or trick!</p>
-<p>Another limitation is using string literals within the SQL itself. Luckily, this can be mitigated by enhancing the parser to keep track if the current point of iteration is within a string literal or not.</p>
-<h2 id="in-closing">In Closing</h2>
-<p>Though the performance gains are negligible in most cases, this approach provides real benefits in clarity, logging and efficiency. You can leverage this same technique to do any kind of string pre-processing at compile time as needed.</p>
-<p><a href="https://gist.github.com/dgski/810ede7c4a80917c0adc99c6852fee9a">Link to Complete Code</a></p>
 
             ]]>
         </content>
