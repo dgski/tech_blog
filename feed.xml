@@ -3,12 +3,56 @@
     <title>Tech @ DG</title>
     <link href="https://tech.davidgorski.ca/feed.xml" rel="self" />
     <link href="https://tech.davidgorski.ca" />
-    <updated>2024-03-20T13:11:49-04:00</updated>
+    <updated>2024-03-25T12:56:06-04:00</updated>
     <author>
         <name>David Gorski</name>
     </author>
     <id>https://tech.davidgorski.ca</id>
 
+    <entry>
+        <title>Self-Hosted Apps: Programmatic Email</title>
+        <author>
+            <name>David Gorski</name>
+        </author>
+        <link href="https://tech.davidgorski.ca/self-hosted-apps-emailing-users/"/>
+        <id>https://tech.davidgorski.ca/self-hosted-apps-emailing-users/</id>
+            <category term="web"/>
+            <category term="self-hosted"/>
+            <category term="docker"/>
+
+        <updated>2024-03-25T12:56:06-04:00</updated>
+            <summary>
+                <![CDATA[
+                    I host a few small web projects using CapRover, a simple web-based&hellip;
+                ]]>
+            </summary>
+        <content type="html">
+            <![CDATA[
+                <p>I host a few small web projects using <a href="https://caprover.com/">CapRover</a>, a simple web-based container orchestration framework built upon Docker Services. For non-critical hobby apps, it is perfect. I simply run CapRover on a virtual private server (VPS) with DigitalOcean and containerize all my running applications; forgoing all systemd setup and dependency installation.</p>
+<p>One feature that I needed was programmatic email. This was necessary for welcome emails, password resets and notifications. CapRover, being a simple docker service orchestrator couldn’t help me. So I needed to find my own solution.</p>
+<p>Before organizing this self-hosted system, I was using MailGun and it was working well for me, but I didn’t want to ‘hardcode’ reliance on external platforms within my apps. I wanted to be as platform-agnostic as possible. At the same time, I knew I couldn’t directly send emails from my VPS (Virtual Private Server), as that would be complex to set up and prone to be marked as spam.</p>
+<p>I decided that what I needed was an internal service that would be queried via an agnostic interface (JSON over HTTP) which would then send the mail via SMTP, another agnostic interface. This would allow all applications to send emails without needing any ‘emailing code dependencies’ and also allow me to change the actual SMTP server as desired for flexibility in just one place.</p>
+<p>I implemented this <code>mailservice</code> in less than 150 lines of go and used the following schema for the JSON request:</p>
+<pre><code class="language-go">type AttachmentInfo struct {
+    Name           string `json:&quot;name&quot;`
+    Base64Contents string `json:&quot;base64contents&quot;`
+}
+
+type MailSendRequest struct {
+    FromAddress string           `json:&quot;from_address&quot;`
+    ToAddress   string           `json:&quot;to_address&quot;`
+    Subject     string           `json:&quot;subject&quot;`
+    Body        string           `json:&quot;body&quot;`
+    ContentType string           `json:&quot;content_type&quot;`
+    Attachments []AttachmentInfo `json:&quot;attachments&quot;`
+}
+</code></pre>
+<p>As far as the SMTP server, I used Amazon SES for it’s low cost and reliability. Whenever I wanted to send email from a new domain, I had to verify I owned it via the Amazon web panel.</p>
+<p>Now it is easy for me to add low-cost emailing capabilities to any new project via this unexposed service running within Docker; it would be as easy as an HTTP request. No libraries needed. Moving my whole deployment to a different orchestration platform would be painless as well as it is all containerized.</p>
+
+            ]]>
+        </content>
+    </entry>
     <entry>
         <title>Imagining Further Decentralization For NOSTR</title>
         <author>
@@ -783,175 +827,6 @@ void assignOne(Data&amp; one) {
 <li>Providing conversion operators for syntax-less unpacking.</li>
 </ol>
 <p>I hope my discussion of these concepts was useful or at least interesting. Thanks for reading! Subscribe via RSS or <a href="https://www.linkedin.com/in/dgski/">LinkedIn</a>.</p>
-
-            ]]>
-        </content>
-    </entry>
-    <entry>
-        <title>C++ Iterator-Friendly Branchless Binary Search</title>
-        <author>
-            <name>David Gorski</name>
-        </author>
-        <link href="https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search/"/>
-        <id>https://tech.davidgorski.ca/c-iterator-friendly-branchless-binary-search/</id>
-
-        <updated>2023-12-18T09:36:35-05:00</updated>
-            <summary>
-                <![CDATA[
-                    Once you delve into the realm of low-latency C++, you will find&hellip;
-                ]]>
-            </summary>
-        <content type="html">
-            <![CDATA[
-                <p>Once you delve into the realm of low-latency C++, you will find yourself waking up in the middle of the night, sweating profusely from a nightmare concerning unnecessary branching. And soon after, you begin to over-optimize your code to avoid branches. Even when that part of your code is clearly not the bottleneck.</p>
-<p>This is a short post presenting a C++ iterator-friendly implementation of a branchless binary search implementation. It is short and sweet, so I will reveal it before some editorial comments and thanks:</p>
-<pre><code>template&lt;typename It&gt;
-It lower_bound(It begin, It end, const typename It::value_type&amp; value) {
-  auto len = std::distance(begin, end);
-  if (len == 0) {
-    return end;
-  }
-
-  while (len &gt; 1) {
-    const auto half = len / 2;
-    begin += (*(begin + half - 1) &lt; value) * half;
-    len -= half;
-  }
-  return (*begin &lt; value) ? end : begin;
-}
-</code></pre>
-<p>This implementation uses a <code>begin</code> iterator and <code>len</code> integer to keep track of the search space rather than begin and end pointers/indices. So the first line of the function are simply using the provided iterators to derive the needed variables. We terminate early if the range is empty. All classic binary search branches within the <code>while</code> loop body have been removed:</p>
-<ul>
-<li>Shrinking the search space length without branches is easy; it will always halve. We can do this safely by subtracting <code>halfLen</code> from the remaining <code>len</code> (This will potentially leave an array of size 1).</li>
-<li>Calculating the new search space start is more tricky. It will either be the same <code>begin</code> as now, or be the halfway point between pos and the end of the search space. So we conditionally add <code>halfLen</code> to <code>begin</code>.</li>
-<li>To conform to the <code>std::lower_bound</code> interface, we must return the end iterator if the value is not found within the range. To do so, unfortunately we must add a final conditional at the end of the function. Thanks to <a href="https://www.linkedin.com/in/farid-mehrabi/">Farhid Mehrabi</a> for pointing this bug out in my initial implementation (I would potentially return a value that is less than the value, breaking the lower bound contract). Adding a simple unit test would have prevented my from doing so, so this a reminder to myself to do so even for small pieces of code.</li>
-</ul>
-<p>For the most part, this implementation will have superior performance to <code>std::lower_bound</code>. There is caveat: since the addition to <code>begin</code> will most likely be turned into a <code>CMOV</code> instruction rather than a proper branch, there will be no prediction to preload the next search space mid-points and at larger array sizes, a classic approach will prevail. This can potentially be mitigated on some platforms by adding an explicit <code>prefetch</code> instruction.</p>
-<p>Thanks to <a href="https://en.algorithmica.org/hpc/data-structures/binary-search/">this amazing article</a> for outlining this concept using raw arrays.</p>
-<h2 id="benchmarks">Benchmarks</h2>
-<p>Nanoseconds taken to find 1000 random numbers that are in the range on Macbook Air M1. <a href="https://gist.github.com/dgski/c48142bcb96cc3bf0bf14fe1072e403f">Code</a>.</p>
-<pre><code>=============================
-array size = 1
-branchlessTime = 18000
-stdTime        = 18000
-=============================
-array size = 2
-branchlessTime = 18000
-stdTime        = 30000
-=============================
-array size = 4
-branchlessTime = 19000
-stdTime        = 39000
-=============================
-array size = 8
-branchlessTime = 19000
-stdTime        = 48000
-=============================
-array size = 16
-branchlessTime = 20000
-stdTime        = 59000
-=============================
-array size = 32
-branchlessTime = 21000
-stdTime        = 69000
-=============================
-array size = 64
-branchlessTime = 21000
-stdTime        = 78000
-=============================
-array size = 128
-branchlessTime = 22000
-stdTime        = 91000
-=============================
-array size = 256
-branchlessTime = 24000
-stdTime        = 103000
-=============================
-array size = 512
-branchlessTime = 28000
-stdTime        = 113000
-=============================
-array size = 1024
-branchlessTime = 31000
-stdTime        = 127000
-=============================
-array size = 2048
-branchlessTime = 35000
-stdTime        = 139000
-=============================
-array size = 4096
-branchlessTime = 38000
-stdTime        = 146000
-=============================
-array size = 8192
-branchlessTime = 42000
-stdTime        = 140000
-=============================
-array size = 16384
-branchlessTime = 40000
-stdTime        = 139000
-=============================
-array size = 32768
-branchlessTime = 45000
-stdTime        = 149000
-=============================
-array size = 65536
-branchlessTime = 64000
-stdTime        = 189000
-=============================
-array size = 131072
-branchlessTime = 79000
-stdTime        = 216000
-=============================
-array size = 262144
-branchlessTime = 91000
-stdTime        = 233000
-=============================
-array size = 524288
-branchlessTime = 105000
-stdTime        = 260000
-=============================
-array size = 1048576
-branchlessTime = 195000
-stdTime        = 351000
-=============================
-array size = 2097152
-branchlessTime = 142000
-stdTime        = 333000
-=============================
-array size = 4194304
-branchlessTime = 397000
-stdTime        = 444000
-=============================
-array size = 8388608
-branchlessTime = 931000
-stdTime        = 961000
-=============================
-array size = 16777216
-branchlessTime = 1159000
-stdTime        = 996000
-=============================
-array size = 33554432
-branchlessTime = 1327000
-stdTime        = 1132000
-=============================
-array size = 67108864
-branchlessTime = 1507000
-stdTime        = 1578000
-=============================
-array size = 134217728
-branchlessTime = 1603000
-stdTime        = 1710000
-=============================
-array size = 268435456
-branchlessTime = 5921000
-stdTime        = 5980000
-=============================
-array size = 536870912
-branchlessTime = 23558000
-stdTime        = 15002000
-</code></pre>
-<p>As you can see the benefits start to deteriorate as the array size grows.</p>
 
             ]]>
         </content>
